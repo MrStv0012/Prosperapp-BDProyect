@@ -92,6 +92,31 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+const verificarAccesoProyecto = (obtenerIdProyecto) => {
+  return async (req, res, next) => {
+    try {
+      const idProyecto = await obtenerIdProyecto(req);
+      if (!idProyecto) {
+        return res.status(404).json({ error: 'Recurso no encontrado.' });
+      }
+ 
+      const query = `
+        SELECT 1 FROM proyecto WHERE id_proyecto = $1 AND id_usuario = $2
+        UNION
+        SELECT 1 FROM colaborador_proyecto WHERE id_proyecto = $1 AND id_usuario = $2;
+      `;
+      const result = await pool.query(query, [idProyecto, req.user.id_usuario]);
+ 
+      if (result.rows.length === 0) {
+        return res.status(403).json({ error: 'No tienes acceso a este proyecto.' });
+      }
+      next();
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  };
+};
+
 app.post('/api/auth/register', async (req, res) => {
   const { nombre, email, password, rol } = req.body;
 
@@ -102,7 +127,7 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
-    const userRol = rol || 'usuario'; 
+    const userRol = 'usuario'; 
 
     const query = `
       INSERT INTO usuario (nombre, email, password_hash, rol, fecha_registro)
@@ -338,236 +363,285 @@ app.post('/api/secciones', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/api/secciones/:id', authenticateToken, async (req, res) => {
-  const idSeccion = req.params.id;
-
-  try {
-    await pool.query('DELETE FROM seccion WHERE id_seccion = $1', [idSeccion]);
-    res.json({ mensaje: 'Sección eliminada con éxito.' });
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.post('/api/funcionalidades', authenticateToken, async (req, res) => {
-  const { titulo, historia_usuario, descripcion_detallada, prioridad, orden, id_seccion } = req.body;
-
-  try {
-    const query = `
-      INSERT INTO funcionalidad (titulo, historia_usuario, descripcion_detallada, prioridad, orden, id_seccion)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [titulo, historia_usuario, descripcion_detallada, prioridad || 'media', orden || 0, id_seccion]);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.get('/api/funcionalidades/:id', authenticateToken, async (req, res) => {
-  const idFuncionalidad = req.params.id;
-
-  try {
-    const cardQuery = `
-      SELECT
-          f.id_funcionalidad,
-          f.titulo,
-          f.historia_usuario,
-          f.descripcion_detallada,
-          f.prioridad,
-          f.id_seccion,
-          COALESCE(
-              (SELECT json_agg(json_build_object('id_nota', n.id_nota, 'contenido', n.contenido, 'fecha', n.fecha))
-               FROM nota_diseno n WHERE n.id_funcionalidad = f.id_funcionalidad),
-              '[]'::json
-          ) AS notas_diseno,
-          COALESCE(
-              (SELECT json_agg(json_build_object('id_fragmento', c.id_fragmento, 'lenguaje', c.lenguaje, 'codigo', c.codigo, 'descripcion', c.descripcion))
-               FROM fragmento_codigo c WHERE c.id_funcionalidad = f.id_funcionalidad),
-              '[]'::json
-          ) AS fragmentos_codigo,
-          COALESCE(
-              (SELECT json_agg(json_build_object('id_decision', d.id_decision, 'descripcion', d.descripcion, 'justificacion', d.justificacion, 'fecha', d.fecha))
-               FROM decision_tecnica d WHERE d.id_funcionalidad = f.id_funcionalidad),
-              '[]'::json
-          ) AS decisiones_tecnicas
-      FROM funcionalidad f
-      WHERE f.id_funcionalidad = $1;
-    `;
-    const cardRes = await pool.query(cardQuery, [idFuncionalidad]);
-    if (cardRes.rows.length === 0) {
-      return res.status(404).json({ error: 'La funcionalidad especificada no existe.' });
+app.delete('/api/secciones/:id', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query('SELECT id_proyecto FROM seccion WHERE id_seccion = $1', [req.params.id]);
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idSeccion = req.params.id;
+    try {
+      await pool.query('DELETE FROM seccion WHERE id_seccion = $1', [idSeccion]);
+      res.json({ mensaje: 'Sección eliminada con éxito.' });
+    } catch (err) {
+      return handleDatabaseError(err, res);
     }
-    const card = cardRes.rows[0];
-
-    const subQuery = `
-      SELECT sub.id_subtarea, sub.descripcion, sub.completada, sub.orden
-      FROM subtarea sub
-      WHERE sub.id_funcionalidad = $1
-      ORDER BY sub.orden;
-    `;
-    const subRes = await pool.query(subQuery, [idFuncionalidad]);
-    card.subtareas = subRes.rows;
-
-    res.json(card);
-  } catch (err) {
-    return handleDatabaseError(err, res);
   }
-});
+);
 
-app.put('/api/funcionalidades/:id/mover', authenticateToken, async (req, res) => {
-  const idFuncionalidad = req.params.id;
-  const { id_seccion, orden } = req.body;
-
-  try {
-    const query = `
-      UPDATE funcionalidad 
-      SET id_seccion = $1, orden = COALESCE($2, orden) 
-      WHERE id_funcionalidad = $3 
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [id_seccion, orden || 0, idFuncionalidad]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Funcionalidad no encontrada.' });
+app.post('/api/funcionalidades', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query('SELECT id_proyecto FROM seccion WHERE id_seccion = $1', [req.body.id_seccion]);
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const { titulo, historia_usuario, descripcion_detallada, prioridad, orden, id_seccion } = req.body;
+    try {
+      const query = `
+        INSERT INTO funcionalidad (titulo, historia_usuario, descripcion_detallada, prioridad, orden, id_seccion)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *;
+      `;
+      const result = await pool.query(query, [titulo, historia_usuario, descripcion_detallada, prioridad || 'media', orden || 0, id_seccion]);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      return handleDatabaseError(err, res);
     }
-    res.json({ mensaje: 'Funcionalidad movida con éxito', funcionalidad: result.rows[0] });
-  } catch (err) {
-    return handleDatabaseError(err, res);
   }
-});
+);
 
-app.post('/api/funcionalidades/:id/subtareas', authenticateToken, async (req, res) => {
-  const idFuncionalidad = req.params.id;
-  const { descripcion, orden } = req.body;
 
-  try {
-    const query = `
-      INSERT INTO subtarea (descripcion, completada, orden, id_funcionalidad)
-      VALUES ($1, false, $2, $3)
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [descripcion, orden || 0, idFuncionalidad]);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.put('/api/subtareas/:id/toggle', authenticateToken, async (req, res) => {
-  const idSubtarea = req.params.id;
-  const { completada } = req.body;
-
-  try {
-    const query = 'UPDATE subtarea SET completada = $1 WHERE id_subtarea = $2 RETURNING *;';
-    const result = await pool.query(query, [completada, idSubtarea]);
-    res.json(result.rows[0]);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.post('/api/funcionalidades/:id/notas', authenticateToken, async (req, res) => {
-  const idFuncionalidad = req.params.id;
-  const { contenido } = req.body;
-
-  try {
-    const query = `
-      INSERT INTO nota_diseno (contenido, id_funcionalidad)
-      VALUES ($1, $2)
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [contenido, idFuncionalidad]);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.post('/api/funcionalidades/:id/fragmentos', authenticateToken, async (req, res) => {
-  const idFuncionalidad = req.params.id;
-  const { lenguaje, codigo, descripcion } = req.body;
-
-  try {
-    const query = `
-      INSERT INTO fragmento_codigo (lenguaje, codigo, descripcion, id_funcionalidad)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [lenguaje, codigo, descripcion, idFuncionalidad]);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.post('/api/funcionalidades/:id/decisiones', authenticateToken, async (req, res) => {
-  const idFuncionalidad = req.params.id;
-  const { descripcion, justificacion } = req.body;
-
-  try {
-    const query = `
-      INSERT INTO decision_tecnica (descripcion, justificacion, id_funcionalidad)
-      VALUES ($1, $2, $3)
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [descripcion, justificacion, idFuncionalidad]);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.get('/api/proyectos/:id/colaboradores', authenticateToken, async (req, res) => {
-  const idProyecto = req.params.id;
-
-  try {
-    const query = `
-      SELECT
-          u.id_usuario,
-          u.nombre,
-          u.email,
-          cp.rol_colaborador,
-          cp.fecha_union
-      FROM colaborador_proyecto cp
-      JOIN usuario u ON u.id_usuario = cp.id_usuario
-      WHERE cp.id_proyecto = $1
-      ORDER BY cp.fecha_union;
-    `;
-    const result = await pool.query(query, [idProyecto]);
-    res.json(result.rows);
-  } catch (err) {
-    return handleDatabaseError(err, res);
-  }
-});
-
-app.post('/api/proyectos/:id/colaboradores', authenticateToken, async (req, res) => {
-  const idProyecto = req.params.id;
-  const { email, rol_colaborador } = req.body;
-
-  if (!email || !rol_colaborador) {
-    return res.status(400).json({ error: 'Suministre email y el rol del colaborador.' });
-  }
-
-  try {
-    const userQuery = 'SELECT id_usuario FROM usuario WHERE email = $1';
-    const userRes = await pool.query(userQuery, [email]);
-    if (userRes.rows.length === 0) {
-      return res.status(404).json({ error: 'No se encontró un usuario con ese correo electrónico.' });
+app.get('/api/funcionalidades/:id', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM funcionalidad f
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE f.id_funcionalidad = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idFuncionalidad = req.params.id;
+    try {
+      const cardQuery = `
+        SELECT
+            f.id_funcionalidad, f.titulo, f.historia_usuario, f.descripcion_detallada,
+            f.prioridad, f.id_seccion,
+            COALESCE((SELECT json_agg(json_build_object('id_nota', n.id_nota, 'contenido', n.contenido, 'fecha', n.fecha))
+                      FROM nota_diseno n WHERE n.id_funcionalidad = f.id_funcionalidad), '[]'::json) AS notas_diseno,
+            COALESCE((SELECT json_agg(json_build_object('id_fragmento', c.id_fragmento, 'lenguaje', c.lenguaje, 'codigo', c.codigo, 'descripcion', c.descripcion))
+                      FROM fragmento_codigo c WHERE c.id_funcionalidad = f.id_funcionalidad), '[]'::json) AS fragmentos_codigo,
+            COALESCE((SELECT json_agg(json_build_object('id_decision', d.id_decision, 'descripcion', d.descripcion, 'justificacion', d.justificacion, 'fecha', d.fecha))
+                      FROM decision_tecnica d WHERE d.id_funcionalidad = f.id_funcionalidad), '[]'::json) AS decisiones_tecnicas
+        FROM funcionalidad f
+        WHERE f.id_funcionalidad = $1;
+      `;
+      const cardRes = await pool.query(cardQuery, [idFuncionalidad]);
+      if (cardRes.rows.length === 0) {
+        return res.status(404).json({ error: 'La funcionalidad especificada no existe.' });
+      }
+      const card = cardRes.rows[0];
+ 
+      const subRes = await pool.query(
+        'SELECT id_subtarea, descripcion, completada, orden FROM subtarea WHERE id_funcionalidad = $1 ORDER BY orden;',
+        [idFuncionalidad]
+      );
+      card.subtareas = subRes.rows;
+      res.json(card);
+    } catch (err) {
+      return handleDatabaseError(err, res);
     }
-    const invitedUserId = userRes.rows[0].id_usuario;
-
-    const insertQuery = `
-      INSERT INTO colaborador_proyecto (id_proyecto, id_usuario, rol_colaborador, fecha_union)
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-      RETURNING *;
-    `;
-    await pool.query(insertQuery, [idProyecto, invitedUserId, rol_colaborador]);
-    res.status(201).json({ mensaje: 'Colaborador invitado exitosamente.' });
-  } catch (err) {
-    return handleDatabaseError(err, res);
   }
-});
+);
+
+app.put('/api/funcionalidades/:id/mover', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM funcionalidad f
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE f.id_funcionalidad = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idFuncionalidad = req.params.id;
+    const { id_seccion, orden } = req.body;
+    try {
+      const query = `
+        UPDATE funcionalidad
+        SET id_seccion = $1, orden = COALESCE($2, orden)
+        WHERE id_funcionalidad = $3
+        RETURNING *;
+      `;
+      const result = await pool.query(query, [id_seccion, orden || 0, idFuncionalidad]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Funcionalidad no encontrada.' });
+      }
+      res.json({ mensaje: 'Funcionalidad movida con éxito', funcionalidad: result.rows[0] });
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.post('/api/funcionalidades/:id/subtareas', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM funcionalidad f
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE f.id_funcionalidad = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idFuncionalidad = req.params.id;
+    const { descripcion, orden } = req.body;
+    try {
+      const query = `
+        INSERT INTO subtarea (descripcion, completada, orden, id_funcionalidad)
+        VALUES ($1, false, $2, $3)
+        RETURNING *;
+      `;
+      const result = await pool.query(query, [descripcion, orden || 0, idFuncionalidad]);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.put('/api/subtareas/:id/toggle', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM subtarea sub
+       JOIN funcionalidad f ON f.id_funcionalidad = sub.id_funcionalidad
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE sub.id_subtarea = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idSubtarea = req.params.id;
+    const { completada } = req.body;
+    try {
+      const query = 'UPDATE subtarea SET completada = $1 WHERE id_subtarea = $2 RETURNING *;';
+      const result = await pool.query(query, [completada, idSubtarea]);
+      res.json(result.rows[0]);
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.post('/api/funcionalidades/:id/notas', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM funcionalidad f
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE f.id_funcionalidad = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idFuncionalidad = req.params.id;
+    const { contenido } = req.body;
+    try {
+      const query = `INSERT INTO nota_diseno (contenido, id_funcionalidad) VALUES ($1, $2) RETURNING *;`;
+      const result = await pool.query(query, [contenido, idFuncionalidad]);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.post('/api/funcionalidades/:id/fragmentos', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM funcionalidad f
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE f.id_funcionalidad = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idFuncionalidad = req.params.id;
+    const { lenguaje, codigo, descripcion } = req.body;
+    try {
+      const query = `INSERT INTO fragmento_codigo (lenguaje, codigo, descripcion, id_funcionalidad) VALUES ($1, $2, $3, $4) RETURNING *;`;
+      const result = await pool.query(query, [lenguaje, codigo, descripcion, idFuncionalidad]);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.post('/api/funcionalidades/:id/decisiones', authenticateToken,
+  verificarAccesoProyecto(async (req) => {
+    const r = await pool.query(
+      `SELECT s.id_proyecto FROM funcionalidad f
+       JOIN seccion s ON s.id_seccion = f.id_seccion
+       WHERE f.id_funcionalidad = $1`,
+      [req.params.id]
+    );
+    return r.rows[0]?.id_proyecto;
+  }),
+  async (req, res) => {
+    const idFuncionalidad = req.params.id;
+    const { descripcion, justificacion } = req.body;
+    try {
+      const query = `INSERT INTO decision_tecnica (descripcion, justificacion, id_funcionalidad) VALUES ($1, $2, $3) RETURNING *;`;
+      const result = await pool.query(query, [descripcion, justificacion, idFuncionalidad]);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.get('/api/proyectos/:id/colaboradores', authenticateToken,
+  verificarAccesoProyecto(async (req) => req.params.id), // aqui la URL YA trae el id_proyecto directo
+  async (req, res) => {
+    const idProyecto = req.params.id;
+    try {
+      const query = `
+        SELECT u.id_usuario, u.nombre, u.email, cp.rol_colaborador, cp.fecha_union
+        FROM colaborador_proyecto cp
+        JOIN usuario u ON u.id_usuario = cp.id_usuario
+        WHERE cp.id_proyecto = $1
+        ORDER BY cp.fecha_union;
+      `;
+      const result = await pool.query(query, [idProyecto]);
+      res.json(result.rows);
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
+
+app.post('/api/proyectos/:id/colaboradores', authenticateToken,
+  verificarAccesoProyecto(async (req) => req.params.id),
+  async (req, res) => {
+    const idProyecto = req.params.id;
+    const { email, rol_colaborador } = req.body;
+    if (!email || !rol_colaborador) {
+      return res.status(400).json({ error: 'Suministre email y el rol del colaborador.' });
+    }
+    try {
+      const userRes = await pool.query('SELECT id_usuario FROM usuario WHERE email = $1', [email]);
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ error: 'No se encontró un usuario con ese correo electrónico.' });
+      }
+      const invitedUserId = userRes.rows[0].id_usuario;
+      const insertQuery = `
+        INSERT INTO colaborador_proyecto (id_proyecto, id_usuario, rol_colaborador, fecha_union)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        RETURNING *;
+      `;
+      await pool.query(insertQuery, [idProyecto, invitedUserId, rol_colaborador]);
+      res.status(201).json({ mensaje: 'Colaborador invitado exitosamente.' });
+    } catch (err) {
+      return handleDatabaseError(err, res);
+    }
+  }
+);
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor de ProsperApp corriendo exitosamente en el puerto ${PORT}`);
