@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProsperApp - Gestión de Proyectos de Software Personales</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .drag-over {
+      border: 2px dashed #6366f1 !important;
+      background-color: rgba(99, 102, 241, 0.05) !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="navigate('dashboard')">
+        <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-200">
+          <i class="fa-solid fa-square-poll-vertical text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-indigo-800 bg-clip-text text-transparent">ProsperApp</h1>
+          <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Proyectos de Software Personales</p>
+        </div>
+      </div>
+      
+      <!-- Selector de Modo de Datos (Demostración Offline o Base de Datos PostgreSQL) -->
+      <div class="flex items-center space-x-4">
+        <div class="hidden sm:flex items-center space-x-2 bg-slate-100 p-1.5 rounded-lg text-xs font-semibold">
+          <button id="btn-mode-demo" onclick="toggleDataMode('demo')" class="px-3 py-1.5 rounded-md bg-white text-indigo-600 shadow-xs transition-all">
+            <i class="fa-solid fa-gamepad mr-1"></i> Modo Demo (DML)
+          </button>
+          <button id="btn-mode-api" onclick="toggleDataMode('api')" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-indigo-600 transition-all">
+            <i class="fa-solid fa-database mr-1"></i> BD PostgreSQL Real
+          </button>
+        </div>
+
+        <div id="user-profile-nav" class="hidden flex items-center space-x-3 border-l pl-4 border-slate-200">
+          <div class="text-right">
+            <p id="user-nav-name" class="text-sm font-semibold text-slate-700"></p>
+            <span id="user-nav-rol" class="inline-block text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"></span>
+          </div>
+          <button onclick="logout()" class="text-slate-400 hover:text-rose-600 transition-colors p-2 rounded-lg hover:bg-rose-50" title="Cerrar sesión">
+            <i class="fa-solid fa-right-from-bracket text-lg"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor para notificaciones flotantes (Toasts) -->
+  <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <section id="view-auth" class="max-w-md mx-auto my-12 hidden">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xl p-8">
+        <div class="text-center mb-8">
+          <h2 id="auth-title" class="text-2xl font-bold text-slate-800">Inicia sesión en ProsperApp</h2>
+          <p id="auth-subtitle" class="text-sm text-slate-500 mt-2">Gestiona tus proyectos de software personales</p>
+        </div>
+
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <!-- Registro: Nombre Completo -->
+          <div id="group-auth-nombre" class="mb-4 hidden">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i class="fa-solid fa-user"></i></span>
+              <input type="text" id="auth-nombre" class="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Ej. Jefferson Peña">
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i class="fa-solid fa-envelope"></i></span>
+              <input type="email" id="auth-email" required class="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="ejemplo@correounivalle.edu.co">
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i class="fa-solid fa-lock"></i></span>
+              <input type="password" id="auth-password" required class="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="••••••••">
+            </div>
+          </div>
+
+          <!-- Registro: Selección de Rol -->
+          <div id="group-auth-rol" class="mb-6 hidden">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Rol de Acceso</label>
+            <select id="auth-rol" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white">
+              <option value="usuario">Usuario Estándar</option>
+              <option value="admin">Administrador del Sistema</option>
+            </select>
+          </div>
+
+          <button type="submit" id="btn-auth-submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all text-sm mb-4">
+            Ingresar
+          </button>
+        </form>
+
+        <div class="text-center pt-4 border-t border-slate-100">
+          <p id="auth-toggle-text" class="text-sm text-slate-500">
+            ¿No tienes cuenta? 
+            <button onclick="toggleAuthMode()" class="text-indigo-600 font-semibold hover:underline">Regístrate gratis</button>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-dashboard" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-800">Tus Proyectos de Software</h2>
+          <p class="text-slate-500 text-sm">Organiza, planifica y codifica tus ideas de software personales</p>
+        </div>
+        <button onclick="openNuevoProyectoModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl shadow-md shadow-indigo-200 font-semibold text-sm transition-all flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Nuevo Proyecto</span>
+        </button>
+      </div>
+
+      <!-- Grid de Proyectos y Sección de Pendientes Urgentes (Consulta 6) -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
+        <!-- Columna de Proyectos (3/4 del ancho) -->
+        <div class="lg:col-span-3 space-y-4">
+          <div id="dashboard-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Generado dinámicamente -->
+          </div>
+          
+          <!-- Estado vacío para Dashboard -->
+          <div id="dashboard-empty" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="text-slate-300 text-6xl mb-4"><i class="fa-solid fa-folder-open"></i></div>
+            <h3 class="text-lg font-bold text-slate-700">Aún no tienes proyectos creados</h3>
+            <p class="text-slate-500 text-sm max-w-sm mx-auto mt-2">Crea tu primer proyecto para empezar a estructurar tus tableros Kanban.</p>
+            <button onclick="openNuevoProyectoModal()" class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all">
+              Crear proyecto ahora
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel Lateral: Mis Pendientes Urgentes (Consulta 6) -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs h-fit space-y-4">
+          <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Pendientes Urgentes (Prioridad Alta)
+          </h3>
+          <p class="text-xs text-slate-400">Tarjetas de alta prioridad antes del estado final.</p>
+          <div id="pendientes-container" class="space-y-3 max-h-[400px] overflow-y-auto">
+            <!-- Cargado de manera dinámica -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="view-board" class="hidden">
+      <div class="flex flex-col gap-4 mb-6">
+        <button onclick="navigate('dashboard')" class="inline-flex items-center space-x-2 text-slate-500 hover:text-indigo-600 text-sm font-medium transition-colors">
+          <i class="fa-solid fa-arrow-left text-xs"></i>
+          <span>Regresar al Dashboard</span>
+        </button>
+
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-slate-200 pb-5">
+          <div>
+            <div class="flex items-center space-x-3 mb-2 flex-wrap gap-y-2">
+              <h2 id="board-project-title" class="text-2xl font-bold text-slate-800"></h2>
+              <span id="board-project-badge" class="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"></span>
+            </div>
+            <p id="board-project-desc" class="text-sm text-slate-500"></p>
+          </div>
+
+          <!-- Acciones del Tablero -->
+          <div class="flex items-center space-x-3">
+            <button onclick="openCollaboratorsModal()" class="inline-flex items-center space-x-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs">
+              <i class="fa-solid fa-users text-slate-500"></i>
+              <span>Colaboradores</span>
+            </button>
+            <button onclick="openAddSectionModal()" class="inline-flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all">
+              <i class="fa-solid fa-plus-square"></i>
+              <span>Nueva Sección</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenedor del Tablero Kanban -->
+      <div id="board-kanban-columns" class="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200">
+        <!-- Renderizado dinámicamente -->
+      </div>
+    </section>
+  </main>
+
+  <div id="modal-nuevo-proyecto" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full shadow-2xl p-6 relative">
+      <button onclick="closeModal('modal-nuevo-proyecto')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+      <h3 class="text-lg font-bold text-slate-800 mb-4">Crear Nuevo Proyecto</h3>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre del Proyecto</label>
+          <input type="text" id="nuevo-proyecto-nombre" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ej. Mi Portafolio">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Descripción Breve</label>
+          <textarea id="nuevo-proyecto-desc" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Describe el alcance del proyecto..."></textarea>
+        </div>
+        
+        <!-- Configuración Inicial de Secciones (Máximo 6) -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-semibold text-slate-700">Secciones del Tablero (Mín. 1, Máx. 6)</label>
+            <button onclick="addSectionInput()" class="text-xs text-indigo-600 font-bold hover:underline"><i class="fa-solid fa-plus"></i> Agregar Sección</button>
+          </div>
+          <div id="secciones-inputs-container" class="space-y-2">
+            <!-- Cargado dinámicamente con las secciones predeterminadas -->
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-3 mt-6">
+        <button onclick="closeModal('modal-nuevo-proyecto')" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
+        <button onclick="submitNuevoProyecto()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors">Crear Proyecto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AGREGAR SECCIÓN ADICIONAL -->
+  <div id="modal-nueva-seccion" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-sm w-full shadow-2xl p-6 relative">
+      <button onclick="closeModal('modal-nueva-seccion')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+      <h3 class="text-lg font-bold text-slate-800 mb-4">Nueva Sección (Máx. 6)</h3>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre de la Sección</label>
+          <input type="text" id="nueva-seccion-nombre" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ej. Testing">
+        </div>
+      </div>
+      <div class="flex justify-end space-x-3 mt-6">
+        <button onclick="closeModal('modal-nueva-seccion')" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
+        <button onclick="submitNuevaSeccion()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR TARJETA -->
+  <div id="modal-nueva-tarjeta" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full shadow-2xl p-6 relative">
+      <button onclick="closeModal('modal-nueva-tarjeta')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+      <h3 class="text-lg font-bold text-slate-800 mb-4">Nueva Funcionalidad</h3>
+      
+      <input type="hidden" id="nueva-tarjeta-seccion-id">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Título de la Tarjeta</label>
+          <input type="text" id="nueva-tarjeta-titulo" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ej. Integración pasarela de pagos">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Historia de Usuario</label>
+          <textarea id="nueva-tarjeta-historia" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs italic" placeholder="Como usuario quiero... para..."></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Descripción Detallada</label>
+          <textarea id="nueva-tarjeta-desc" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Detalles específicos para desarrollo..."></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Prioridad</label>
+          <select id="nueva-tarjeta-prioridad" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="baja">Baja</option>
+            <option value="media" selected>Media</option>
+            <option value="alta">Alta</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-3 mt-6">
+        <button onclick="closeModal('modal-nueva-tarjeta')" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
+        <button onclick="submitNuevaTarjeta()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">Crear Tarjeta</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-detalle-tarjeta" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-40 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8 relative">
+      <button onclick="closeModal('modal-detalle-tarjeta')" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"><i class="fa-solid fa-times text-lg"></i></button>
+      
+      <input type="hidden" id="detalle-tarjeta-id">
+
+      <div class="border-b border-slate-100 pb-5 mb-6">
+        <div class="flex items-center space-x-3 mb-2 flex-wrap gap-y-2">
+          <span id="detalle-prioridad" class="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider"></span>
+          <span class="text-slate-400 text-xs font-medium">| Código Interno: Func-<span id="detalle-codigo-id"></span></span>
+        </div>
+        <h3 id="detalle-titulo" class="text-2xl font-bold text-slate-800"></h3>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Columna Izquierda: Información Principal, Historias y Subtareas -->
+        <div class="lg:col-span-2 space-y-6">
+          
+          <!-- Historia de Usuario -->
+          <div class="bg-indigo-50/50 rounded-xl p-4 border border-indigo-100/50">
+            <h4 class="text-xs font-bold uppercase text-indigo-700 tracking-wider mb-2 flex items-center gap-1.5">
+              <i class="fa-solid fa-user-gear"></i> Historia de Usuario
+            </h4>
+            <p id="detalle-historia" class="text-sm italic text-indigo-900 leading-relaxed"></p>
+          </div>
+
+          <!-- Descripción Detallada -->
+          <div>
+            <h4 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-align-left text-slate-400"></i> Descripción Técnica / Requisitos
+            </h4>
+            <p id="detalle-descripcion" class="text-sm text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 leading-relaxed whitespace-pre-line"></p>
+          </div>
+
+          <!-- Checklist de Subtareas (Consulta 3) -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-tasks text-slate-400"></i> Checklist de Subtareas
+              </h4>
+              <span id="detalle-subtareas-avance" class="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full"></span>
+            </div>
+            
+            <div class="w-full bg-slate-100 rounded-full h-2 mb-4 overflow-hidden">
+              <div id="detalle-subtareas-progreso-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <div id="detalle-subtareas-list" class="space-y-2 max-h-48 overflow-y-auto mb-3">
+              <!-- Dinámico -->
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <input type="text" id="nueva-subtarea-input" class="flex-grow text-xs px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" placeholder="Ingresa una subtarea para esta funcionalidad...">
+              <button onclick="submitNuevaSubtarea()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">Agregar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Satélites (Notas, Snippets, Decisiones de Consulta 4) -->
+        <div class="space-y-6">
+          <div class="border-b border-slate-200">
+            <nav class="flex space-x-4" aria-label="Tabs">
+              <button onclick="switchTab('diseno')" id="tab-diseno" class="tab-btn pb-3 px-1 border-b-2 border-indigo-500 text-indigo-600 text-xs font-bold">
+                DISEÑO
+              </button>
+              <button onclick="switchTab('codigo')" id="tab-codigo" class="tab-btn pb-3 px-1 border-b-2 border-transparent text-slate-500 hover:text-slate-700 text-xs font-bold">
+                CÓDIGO
+              </button>
+              <button onclick="switchTab('decisiones')" id="tab-decisiones" class="tab-btn pb-3 px-1 border-b-2 border-transparent text-slate-500 hover:text-slate-700 text-xs font-bold">
+                DECISIONES
+              </button>
+            </nav>
+          </div>
+
+          <!-- Contenido Pestaña: NOTAS DE DISEÑO -->
+          <div id="pane-diseno" class="tab-pane space-y-4">
+            <div id="list-notas-diseno" class="space-y-3 max-h-56 overflow-y-auto">
+              <!-- Dinámico -->
+            </div>
+            <div class="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <h5 class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-feather mr-1 text-indigo-500"></i> Registrar Nota de Arquitectura</h5>
+              <textarea id="nueva-nota-contenido" rows="2" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" placeholder="Ej. Se usará un patrón MVC para organizar el backend..."></textarea>
+              <button onclick="submitNuevaNota()" class="w-full bg-slate-800 text-white text-xs py-1.5 rounded-lg hover:bg-slate-900 transition-colors">Guardar Nota</button>
+            </div>
+          </div>
+
+          <!-- Contenido Pestaña: FRAGMENTOS DE CÓDIGO -->
+          <div id="pane-codigo" class="tab-pane hidden space-y-4">
+            <div id="list-fragmentos-codigo" class="space-y-3 max-h-56 overflow-y-auto">
+              <!-- Dinámico -->
+            </div>
+            <div class="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <h5 class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-code mr-1 text-emerald-500"></i> Registrar Fragmento de Código</h5>
+              <input type="text" id="nuevo-fragmento-descripcion" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none bg-white" placeholder="Descripción breve (ej. Conexión Pool PG)">
+              <select id="nuevo-fragmento-lenguaje" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none bg-white">
+                <option value="SQL">SQL (PostgreSQL)</option>
+                <option value="JavaScript">JavaScript</option>
+                <option value="Python">Python</option>
+              </select>
+              <textarea id="nuevo-fragmento-codigo" rows="2" class="w-full font-mono text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white" placeholder="SELECT * FROM ..."></textarea>
+              <button onclick="submitNuevoFragmento()" class="w-full bg-slate-800 text-white text-xs py-1.5 rounded-lg hover:bg-slate-900 transition-colors">Guardar Snippet</button>
+            </div>
+          </div>
+
+          <!-- Contenido Pestaña: DECISIONES TÉCNICAS -->
+          <div id="pane-decisiones" class="tab-pane hidden space-y-4">
+            <div id="list-decisiones-tecnicas" class="space-y-3 max-h-56 overflow-y-auto">
+              <!-- Dinámico -->
+            </div>
+            <div class="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <h5 class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-scale-balanced mr-1 text-amber-500"></i> Registrar Decisión Técnica</h5>
+              <input type="text" id="nueva-decision-titulo" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none bg-white" placeholder="Ej. Usar PostgreSQL">
+              <textarea id="nueva-decision-justificacion" rows="2" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white" placeholder="Justificación de la decisión..."></textarea>
+              <button onclick="submitNuevaDecision()" class="w-full bg-slate-800 text-white text-xs py-1.5 rounded-lg hover:bg-slate-900 transition-colors">Guardar Decisión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-colaboradores" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-lg w-full shadow-2xl p-6 relative">
+      <button onclick="closeModal('modal-colaboradores')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-lg"></i></button>
+      <h3 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+        <i class="fa-solid fa-user-group text-indigo-500"></i> Colaboradores del Proyecto
+      </h3>
+      <p class="text-slate-500 text-xs mb-4">Manejo de accesos del proyecto.</p>
+
+      <div class="space-y-2.5 mb-6 max-h-48 overflow-y-auto border-b border-slate-100 pb-4">
+        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Equipo Autorizado</h4>
+        <div id="colaboradores-lista-container" class="space-y-2">
+          <!-- Dinámico -->
+        </div>
+      </div>
+
+      <div id="colaboradores-invite-form" class="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-3">
+        <h4 class="text-xs font-bold text-slate-700 flex items-center gap-1.5"><i class="fa-solid fa-user-plus text-slate-400"></i> Invitar Nuevo Colaborador</h4>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Correo Electrónico</label>
+            <input type="email" id="colaborador-email" class="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-lg focus:outline-none bg-white" placeholder="correo@correounivalle.edu.co">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rol de Acceso</label>
+            <select id="colaborador-rol-acceso" class="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-lg focus:outline-none bg-white">
+              <option value="editor">Editor (Puede mover y crear)</option>
+              <option value="lector">Lector (Solo ver tablero)</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="submitColaborador()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors">
+          Invitar Colaborador
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let state = {
+      dataMode: 'demo', // 'demo' o 'api'
+      currentUser: null,
+      token: null,
+      projects: [],
+      activeProject: null,
+      activeCard: null,
+      activeCardDetails: null,
+      view: 'auth',
+      activeTab: 'diseno'
+    };
+
+    const API_BASE_URL = 'http://localhost:3000/api';
+
+    // BANCO DE DATOS OFFLINE EXACTO A TU SCRIPT DML
+    let demoDatabase = {
+      usuarios: [
+        { id_usuario: 1, nombre: "Jefferson Peña", email: "jefferson.pena@correounivalle.edu.co", rol: "admin" },
+        { id_usuario: 2, nombre: "Camila Rojas", email: "camila.rojas@correounivalle.edu.co", rol: "usuario" },
+        { id_usuario: 3, nombre: "Andrés Gómez", email: "andres.gomez@correounivalle.edu.co", rol: "usuario" }
+      ],
+      proyectos: [
+        { id_proyecto: 1, nombre: "ProsperApp", descripcion: "Herramienta para gestionar proyectos de software personales.", fecha_creacion: "2026-03-01", estado: "activo", id_usuario: 1, rol_acceso: "dueño", porcentaje_avance: 40.0 },
+        { id_proyecto: 2, nombre: "Bot de Telegram para recordatorios", descripcion: "Prueba de concepto de un bot que envía recordatorios diarios.", fecha_creacion: "2026-03-02", estado: "activo", id_usuario: 1, rol_acceso: "dueño", porcentaje_avance: 0.0 },
+        { id_proyecto: 3, nombre: "Rediseño de portafolio personal", descripcion: "Sitio web con Next.js para mostrar proyectos propios.", fecha_creacion: "2026-03-03", estado: "archivado", id_usuario: 2, rol_acceso: "editor", porcentaje_avance: 0.0 },
+        { id_proyecto: 4, nombre: "API de finanzas personales", descripcion: "Backend en FastAPI para llevar control de gastos.", fecha_creacion: "2026-03-04", estado: "activo", id_usuario: 3, rol_acceso: "editor", porcentaje_avance: 0.0 }
+      ],
+      secciones: {
+        1: [
+          { id_seccion: 1, nombre: "Backlog", orden: 1, id_proyecto: 1 },
+          { id_seccion: 2, nombre: "Doing", orden: 2, id_proyecto: 1 },
+          { id_seccion: 3, nombre: "Completed", orden: 3, id_proyecto: 1 },
+          { id_seccion: 4, nombre: "Release", orden: 4, id_proyecto: 1 }
+        ],
+        2: [
+          { id_seccion: 5, nombre: "Backlog", orden: 1, id_proyecto: 2 },
+          { id_seccion: 6, nombre: "Doing", orden: 2, id_proyecto: 2 },
+          { id_seccion: 7, nombre: "Completed", orden: 3, id_proyecto: 2 }
+        ],
+        3: [
+          { id_seccion: 8, nombre: "Backlog", orden: 1, id_proyecto: 3 },
+          { id_seccion: 9, nombre: "Doing", orden: 2, id_proyecto: 3 },
+          { id_seccion: 10, nombre: "Completed", orden: 3, id_proyecto: 3 }
+        ],
+        4: [
+          { id_seccion: 11, nombre: "Backlog", orden: 1, id_proyecto: 4 },
+          { id_seccion: 12, nombre: "Doing", orden: 2, id_proyecto: 4 },
+          { id_seccion: 13, text_align: "Completed", orden: 3, id_proyecto: 4 },
+          { id_seccion: 14, nombre: "Release", orden: 4, id_proyecto: 4 }
+        ]
+      },
+      funcionalidades: {
+        1: [
+          { id_funcionalidad: 1, titulo: "Autenticación de usuarios", historia_usuario: "Como usuario quiero registrarme e iniciar sesión para acceder a mis proyectos.", descripcion_detallada: "Login con email y contraseña, hash con bcrypt.", prioridad: "alta", orden: 1, id_seccion: 1 },
+          { id_funcionalidad: 2, titulo: "Tablero Kanban", historia_usuario: "Como usuario quiero ver mis funcionalidades organizadas en columnas para seguir el progreso.", descripcion_detallada: "Drag and drop entre secciones.", prioridad: "alta", orden: 2, id_seccion: 1 }
+        ],
+        2: [
+          { id_funcionalidad: 3, titulo: "Checklist de subtareas", historia_usuario: "Como usuario quiero dividir una funcionalidad en subtareas para organizarme mejor.", descripcion_detallada: "", prioridad: "media", orden: 1, id_seccion: 2 }
+        ],
+        3: [
+          { id_funcionalidad: 4, titulo: "Notas de diseño por funcionalidad", historia_usuario: "Como usuario quiero anotar decisiones de diseño dentro de cada tarjeta.", descripcion_detallada: "", prioridad: "media", orden: 1, id_seccion: 3 }
+        ],
+        4: [
+          { id_funcionalidad: 5, titulo: "Exportar proyecto a PDF", historia_usuario: "Como usuario quiero exportar el resumen de mi proyecto en PDF.", descripcion_detallada: "Se usa la librería reportlab en el backend.", prioridad: "baja", orden: 1, id_seccion: 4 }
+        ],
+        5: [
+          { id_funcionalidad: 6, titulo: "Comando /recordar", historia_usuario: "Como usuario quiero escribir /recordar para programar un aviso.", prioridad: "alta", orden: 1, id_seccion: 5 }
+        ],
+        6: [
+          { id_funcionalidad: 7, titulo: "Notificaciones diarias", historia_usuario: "Como usuario quiero recibir un resumen diario de mis pendientes.", prioridad: "media", orden: 1, id_seccion: 6 }
+        ],
+        7: [],
+        8: [
+          { id_funcionalidad: 8, titulo: "Sección de proyectos destacados", historia_usuario: "Como visitante quiero ver los proyectos más relevantes primero.", prioridad: "media", orden: 1, id_seccion: 8 }
+        ],
+        9: [
+          { id_funcionalidad: 9, titulo: "Modo oscuro", historia_usuario: "Como visitante quiero cambiar entre modo claro y oscuro.", prioridad: "baja", orden: 1, id_seccion: 9 }
+        ],
+        10: [],
+        11: [
+          { id_funcionalidad: 10, titulo: "Registro de gastos por categoría", historia_usuario: "Como usuario quiero clasificar mis gastos para ver en qué gasto más.", prioridad: "alta", orden: 1, id_seccion: 11 }
+        ],
+        12: [
+          { id_funcionalidad: 11, titulo: "Reporte mensual", historia_usuario: "Como usuario quiero un resumen mensual de ingresos y gastos.", prioridad: "media", orden: 1, id_seccion: 12 }
+        ],
+        13: [],
+        14: []
+      },
+      subtareas: {
+        1: [
+          { id_subtarea: 1, descripcion: "Diseñar tabla usuario", completada: true, orden: 1 },
+          { id_subtarea: 2, descripcion: "Implementar hash de contraseña", completada: true, orden: 2 },
+          { id_subtarea: 3, descripcion: "Crear endpoint de login", completada: false, orden: 3 },
+          { id_subtarea: 4, descripcion: "Crear endpoint de registro", completada: false, orden: 4 }
+        ],
+        3: [
+          { id_subtarea: 5, descripcion: "Definir modelo de datos de subtarea", completada: true, orden: 1 },
+          { id_subtarea: 6, descripcion: "Conectar checklist con la UI", completada: false, orden: 2 }
+        ]
+      },
+      notas_diseno: {
+        1: [{ id_nota: 1, contenido: "Se decidió usar JWT en vez de sesiones para facilitar el escalado horizontal.", fecha: "2026-03-12" }],
+        2: [{ id_nota: 2, contenido: "El drag and drop se implementará con la librería dnd-kit por su buen soporte de accesibilidad.", fecha: "2026-03-12" }],
+        3: [{ id_nota: 3, contenido: "Evaluar si el checklist necesita fechas límite en una futura iteración.", fecha: "2026-03-12" }]
+      },
+      fragmentos_codigo: {
+        1: [{ id_fragmento: 1, lenguaje: "SQL", codigo: "SELECT * FROM usuario WHERE email = $1;", descripcion: "Consulta base para el login" }],
+        2: [{ id_fragmento: 2, lenguaje: "JavaScript", codigo: "function moverTarjeta(id, nuevaSeccion) { /* actualiza id_seccion */ }", descripcion: "Función de drag and drop" }]
+      },
+      decisiones_tecnicas: {
+        1: [{ id_decision: 1, descripcion: "Usar PostgreSQL como motor de base de datos.", justificacion: "Soporta triggers, CHECK constraints avanzados.", fecha: "2026-03-12" }],
+        2: [{ id_decision: 2, descripcion: "Separar notas, código y decisiones en tablas propias.", justificacion: "Cumple con la Primera Forma Normal (1FN).", fecha: "2026-03-12" }]
+      },
+      colaboradores: {
+        1: [
+          { id_usuario: 2, nombre: "Camila Rojas", email: "camila.rojas@correounivalle.edu.co", rol_colaborador: "editor", fecha_union: "2026-03-10" },
+          { id_usuario: 3, nombre: "Andrés Gómez", email: "andres.gomez@correounivalle.edu.co", rol_colaborador: "lector", fecha_union: "2026-03-10" }
+        ],
+        4: [
+          { id_usuario: 1, nombre: "Jefferson Peña", email: "jefferson.pena@correounivalle.edu.co", rol_colaborador: "editor", fecha_union: "2026-03-10" }
+        ]
+      }
+    };
+
+    window.onload = function() {
+      const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem('token');
+      const savedMode = localStorage.getItem('dataMode');
+
+      if (savedMode) {
+        state.dataMode = savedMode;
+      }
+      
+      updateModeButtonsUI();
+
+      if (savedUser && savedToken) {
+        state.currentUser = JSON.parse(savedUser);
+        state.token = savedToken;
+        navigate('dashboard');
+      } else {
+        navigate('auth');
+      }
+    };
+
+    function toggleDataMode(mode) {
+      state.dataMode = mode;
+      localStorage.setItem('dataMode', mode);
+      updateModeButtonsUI();
+      showToast(`Cambiado con éxito al modo: ${mode === 'demo' ? 'Demostración Offline' : 'PostgreSQL Real'}`, 'success');
+      
+      if (state.currentUser) {
+        navigate('dashboard');
+      }
+    }
+
+    function updateModeButtonsUI() {
+      const btnDemo = document.getElementById('btn-mode-demo');
+      const btnApi = document.getElementById('btn-mode-api');
+      if (state.dataMode === 'demo') {
+        btnDemo.className = "px-3 py-1.5 rounded-md bg-white text-indigo-600 shadow-xs transition-all";
+        btnApi.className = "px-3 py-1.5 rounded-md text-slate-600 hover:text-indigo-600 transition-all";
+      } else {
+        btnApi.className = "px-3 py-1.5 rounded-md bg-white text-indigo-600 shadow-xs transition-all";
+        btnDemo.className = "px-3 py-1.5 rounded-md text-slate-600 hover:text-indigo-600 transition-all";
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let colors = 'bg-white border-slate-200 text-slate-700';
+      let icon = '<i class="fa-solid fa-info text-indigo-500 mr-2.5"></i>';
+
+      if (type === 'success') {
+        colors = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+        icon = '<i class="fa-solid fa-circle-check text-emerald-500 mr-2.5"></i>';
+      } else if (type === 'error') {
+        colors = 'bg-rose-50 border-rose-200 text-rose-800';
+        icon = '<i class="fa-solid fa-triangle-exclamation text-rose-500 mr-2.5"></i>';
+      }
+
+      toast.className = `flex items-center p-3.5 rounded-xl border shadow-lg ${colors} transition-all transform translate-x-10 opacity-0 duration-300 text-xs font-semibold`;
+      toast.innerHTML = `${icon} <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.remove('translate-x-10', 'opacity-0');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-5');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function navigate(viewName) {
+      state.view = viewName;
+      
+      document.getElementById('view-auth').classList.add('hidden');
+      document.getElementById('view-dashboard').classList.add('hidden');
+      document.getElementById('view-board').classList.add('hidden');
+
+      const profileNav = document.getElementById('user-profile-nav');
+      if (state.currentUser) {
+        profileNav.classList.remove('hidden');
+        document.getElementById('user-nav-name').innerText = state.currentUser.nombre;
+        document.getElementById('user-nav-rol').innerText = state.currentUser.rol || 'usuario';
+      } else {
+        profileNav.classList.add('hidden');
+      }
+
+      if (viewName === 'auth') {
+        document.getElementById('view-auth').classList.remove('hidden');
+      } else if (viewName === 'dashboard') {
+        document.getElementById('view-dashboard').classList.remove('hidden');
+        loadDashboardProjects();
+        loadPendientesUrgentes();
+      } else if (viewName === 'board') {
+        document.getElementById('view-board').classList.remove('hidden');
+        loadBoardDetails();
+      }
+    }
+
+    let isRegisterMode = false;
+
+    function toggleAuthMode() {
+      isRegisterMode = !isRegisterMode;
+      const title = document.getElementById('auth-title');
+      const subtitle = document.getElementById('auth-subtitle');
+      const submitBtn = document.getElementById('btn-auth-submit');
+      const toggleText = document.getElementById('auth-toggle-text');
+      const groupNombre = document.getElementById('group-auth-nombre');
+      const groupRol = document.getElementById('group-auth-rol');
+
+      if (isRegisterMode) {
+        title.innerText = "Regístrate en ProsperApp";
+        subtitle.innerText = "Crea tu cuenta de base de datos universitaria";
+        submitBtn.innerText = "Comenzar Registro";
+        toggleText.innerHTML = `¿Ya tienes cuenta? <button onclick="toggleAuthMode()" class="text-indigo-600 font-semibold hover:underline">Inicia sesión</button>`;
+        groupNombre.classList.remove('hidden');
+        groupRol.classList.remove('hidden');
+      } else {
+        title.innerText = "Inicia sesión en ProsperApp";
+        subtitle.innerText = "Gestiona tus tableros kanban con PostgreSQL";
+        submitBtn.innerText = "Ingresar";
+        toggleText.innerHTML = `¿No tienes cuenta? <button onclick="toggleAuthMode()" class="text-indigo-600 font-semibold hover:underline">Regístrate gratis</button>`;
+        groupNombre.classList.add('hidden');
+        groupRol.classList.add('hidden');
+      }
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('auth-email').value;
+      const password = document.getElementById('auth-password').value;
+      const nombre = document.getElementById('auth-nombre').value;
+      const rol = document.getElementById('auth-rol').value;
+
+      if (state.dataMode === 'demo') {
+        if (isRegisterMode) {
+          const nuevoId = demoDatabase.usuarios.length + 1;
+          const nuevoUser = { id_usuario: nuevoId, nombre, email, rol };
+          demoDatabase.usuarios.push(nuevoUser);
+          state.currentUser = nuevoUser;
+          state.token = "demo_jwt_token_" + nuevoId;
+          showToast("¡Registro exitoso en modo Demo!", "success");
+        } else {
+          const found = demoDatabase.usuarios.find(u => u.email === email);
+          if (found) {
+            state.currentUser = found;
+            state.token = "demo_jwt_token_" + found.id_usuario;
+            showToast(`¡Bienvenido, ${found.nombre}!`, "success");
+          } else {
+            showToast("Usuario no encontrado en la base de datos de demostración.", "error");
+            return;
+          }
+        }
+        localStorage.setItem('user', JSON.stringify(state.currentUser));
+        localStorage.setItem('token', state.token);
+        navigate('dashboard');
+      } else {
+        const url = isRegisterMode ? `${API_BASE_URL}/auth/register` : `${API_BASE_URL}/auth/login`;
+        const bodyData = isRegisterMode 
+          ? { nombre, email, password, rol } 
+          : { email, password };
+
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData)
+          });
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Error al autenticar');
+          }
+
+          if (isRegisterMode) {
+            showToast('Usuario registrado con éxito. Ya puedes iniciar sesión.', 'success');
+            toggleAuthMode();
+          } else {
+            state.currentUser = data.user;
+            state.token = data.token;
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
+            showToast('Acceso verificado. ¡Bienvenido!', 'success');
+            navigate('dashboard');
+          }
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    function logout() {
+      state.currentUser = null;
+      state.token = null;
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      showToast('Sesión cerrada con éxito', 'info');
+      navigate('auth');
+    }
+
+    async function loadDashboardProjects() {
+      const grid = document.getElementById('dashboard-grid');
+      const emptyDiv = document.getElementById('dashboard-empty');
+      grid.innerHTML = '';
+
+      if (state.dataMode === 'demo') {
+        const userId = state.currentUser.id_usuario;
+        const delUsuario = demoDatabase.proyectos.filter(p => p.id_usuario === userId).map(p => ({...p, rol_acceso: 'dueño'}));
+        const deColaborador = [];
+        
+        Object.keys(demoDatabase.colaboradores).forEach(projId => {
+          const list = demoDatabase.colaboradores[projId] || [];
+          const matched = list.find(c => c.id_usuario === userId);
+          if (matched) {
+            const originalProj = demoDatabase.proyectos.find(p => p.id_proyecto === parseInt(projId));
+            if (originalProj) {
+              deColaborador.push({...originalProj, rol_acceso: matched.rol_colaborador});
+            }
+          }
+        });
+
+        const combined = [...delUsuario, ...deColaborador];
+        combined.forEach(p => {
+          const secs = demoDatabase.secciones[p.id_proyecto] || [];
+          const maxOrden = secs.length > 0 ? Math.max(...secs.map(s => s.orden)) : 0;
+          const ultimaSeccion = secs.find(s => s.orden === maxOrden);
+          
+          let totalCards = 0;
+          let cardsUltimaSeccion = 0;
+          
+          secs.forEach(s => {
+            const list = demoDatabase.funcionalidades[s.id_seccion] || [];
+            totalCards += list.length;
+            if (ultimaSeccion && s.id_seccion === ultimaSeccion.id_seccion) {
+              cardsUltimaSeccion += list.length;
+            }
+          });
+
+          p.porcentaje_avance = totalCards > 0 ? Math.round((cardsUltimaSeccion / totalCards) * 100) : 0;
+        });
+
+        state.projects = combined;
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/proyectos`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+          });
+          if (!response.ok) throw new Error('Error al obtener proyectos');
+          state.projects = await response.json();
+        } catch (err) {
+          showToast(err.message, 'error');
+          return;
+        }
+      }
+
+      if (state.projects.length === 0) {
+        grid.classList.add('hidden');
+        emptyDiv.classList.remove('hidden');
+        return;
+      }
+
+      grid.classList.remove('hidden');
+      emptyDiv.classList.add('hidden');
+
+      state.projects.forEach(proj => {
+        const isOwner = proj.rol_acceso === 'dueño';
+        const progress = proj.porcentaje_avance || 0;
+        
+        const cardHtml = `
+          <div onclick="selectProject(${proj.id_proyecto})" class="bg-white border border-slate-200/80 hover:border-indigo-400 p-5 rounded-2xl shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-52">
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="inline-block px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg ${isOwner ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}">
+                  ${proj.rol_acceso}
+                </span>
+                <span class="text-xs font-semibold text-slate-400"><i class="fa-solid fa-clock mr-1"></i>${new Date(proj.fecha_creacion).toLocaleDateString()}</span>
+              </div>
+              <h3 class="text-base font-bold text-slate-800 group-hover:text-indigo-600 transition-colors line-clamp-1">${proj.nombre}</h3>
+              <p class="text-xs text-slate-500 mt-1 line-clamp-2">${proj.descripcion || 'Sin descripción adicional.'}</p>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1.5">
+                <span>Progreso </span>
+                <span>${progress}%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+        grid.insertAdjacentHTML('beforeend', cardHtml);
+      });
+    }
+
+    async function loadPendientesUrgentes() {
+      const container = document.getElementById('pendientes-container');
+      container.innerHTML = '';
+
+      let pendientes = [];
+
+      if (state.dataMode === 'demo') {
+        const userId = state.currentUser.id_usuario;
+        const accesibles = state.projects.map(p => p.id_proyecto);
+        
+        accesibles.forEach(projId => {
+          const originalProj = demoDatabase.proyectos.find(p => p.id_proyecto === projId);
+          const secs = demoDatabase.secciones[projId] || [];
+          if (secs.length === 0) return;
+          
+          const maxOrden = Math.max(...secs.map(s => s.orden));
+          
+          secs.forEach(s => {
+            if (s.orden >= maxOrden) return; 
+            const cards = demoDatabase.funcionalidades[s.id_seccion] || [];
+            cards.forEach(f => {
+              if (f.prioridad === 'alta') {
+                pendientes.push({
+                  proyecto: originalProj.nombre,
+                  seccion_actual: s.nombre,
+                  id_funcionalidad: f.id_funcionalidad,
+                  titulo: f.titulo,
+                  prioridad: f.prioridad
+                });
+              }
+            });
+          });
+        });
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/pendientes`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+          });
+          if (response.ok) {
+            pendientes = await response.json();
+          }
+        } catch (err) {
+          console.error("Error al traer pendientes: ", err);
+        }
+      }
+
+      if (pendientes.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic">No hay tareas de alta prioridad pendientes en desarrollo.</p>';
+        return;
+      }
+
+      pendientes.forEach(p => {
+        container.insertAdjacentHTML('beforeend', `
+          <div onclick="openCardDetailModal(${p.id_funcionalidad})" class="p-3 bg-rose-50/50 border border-rose-100 rounded-xl cursor-pointer hover:bg-rose-50 transition-all">
+            <span class="inline-block text-[9px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded mb-1">alta</span>
+            <h4 class="text-xs font-bold text-slate-800 line-clamp-1">${p.titulo}</h4>
+            <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>Proj: ${p.proyecto}</span>
+              <span class="font-semibold text-slate-500">${p.seccion_actual}</span>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function selectProject(id) {
+      state.activeProject = state.projects.find(p => p.id_proyecto === id);
+      navigate('board');
+    }
+
+    async function loadBoardDetails() {
+      const container = document.getElementById('board-kanban-columns');
+      container.innerHTML = '';
+
+      if (!state.activeProject) return;
+
+      document.getElementById('board-project-title').innerText = state.activeProject.nombre;
+      document.getElementById('board-project-desc').innerText = state.activeProject.descripcion || 'Sin descripción';
+      
+      const badge = document.getElementById('board-project-badge');
+      badge.innerText = state.activeProject.rol_acceso;
+      if (state.activeProject.rol_acceso === 'dueño') {
+        badge.className = 'inline-block px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-indigo-50 text-indigo-600 border border-indigo-100';
+      } else {
+        badge.className = 'inline-block px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-emerald-50 text-emerald-600 border border-emerald-100';
+      }
+
+      let data;
+      if (state.dataMode === 'demo') {
+        const projId = state.activeProject.id_proyecto;
+        const seccionesProj = demoDatabase.secciones[projId] || [];
+        
+        const tablero = seccionesProj.map(sec => {
+          const funcs = demoDatabase.funcionalidades[sec.id_seccion] || [];
+          const funcsConMeta = funcs.map(f => {
+            const subs = demoDatabase.subtareas[f.id_funcionalidad] || [];
+            return {
+              ...f,
+              total_subtareas: subs.length,
+              completadas_subtareas: subs.filter(s => s.completada).length
+            };
+          });
+          return { ...sec, funcionalidades: funcsConMeta };
+        });
+        data = { rol_acceso: state.activeProject.rol_acceso, tablero };
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/proyectos/${state.activeProject.id_proyecto}/tablero`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+          });
+          if (!response.ok) throw new Error('Error al obtener estructura del tablero');
+          data = await response.json();
+        } catch (err) {
+          showToast(err.message, 'error');
+          return;
+        }
+      }
+
+      data.tablero.forEach(columna => {
+        const numTarjetas = columna.funcionalidades.length;
+        
+        let columnHtml = `
+          <div class="bg-slate-100 border border-slate-200/60 rounded-2xl w-72 sm:w-80 shrink-0 p-4 flex flex-col max-h-[70vh]">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/50">
+              <div class="flex items-center space-x-2">
+                <h4 class="text-sm font-bold text-slate-800">${columna.nombre}</h4>
+                <span class="text-xs font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">${numTarjetas}</span>
+              </div>
+              <div class="flex items-center space-x-1">
+                <button onclick="openAddCardModal(${columna.id_seccion})" class="text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-slate-200" title="Nueva Tarjeta">
+                  <i class="fa-solid fa-plus text-xs"></i>
+                </button>
+                <button onclick="eliminarSeccion(${columna.id_seccion})" class="text-slate-500 hover:text-rose-600 p-1.5 rounded-lg hover:bg-slate-200" title="Eliminar Sección">
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="section-${columna.id_seccion}" 
+                 class="space-y-3 overflow-y-auto flex-grow pb-12" 
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)" 
+                 ondrop="handleDrop(event, ${columna.id_seccion})">
+        `;
+
+        columna.funcionalidades.forEach(card => {
+          let priorityColor = 'bg-slate-100 text-slate-500';
+          if (card.prioridad === 'alta') priorityColor = 'bg-rose-50 text-rose-600 border border-rose-100';
+          else if (card.prioridad === 'media') priorityColor = 'bg-amber-50 text-amber-600 border border-amber-100';
+          else if (card.prioridad === 'baja') priorityColor = 'bg-sky-50 text-sky-600 border border-sky-100';
+
+          const pctSub = card.total_subtareas > 0 ? Math.round((card.completadas_subtareas / card.total_subtareas) * 100) : 0;
+
+          columnHtml += `
+            <div draggable="true" 
+                 ondragstart="handleDragStart(event, ${card.id_funcionalidad}, ${columna.id_seccion})"
+                 onclick="openCardDetailModal(${card.id_funcionalidad})"
+                 class="bg-white border border-slate-200/80 p-4 rounded-xl shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all hover:border-slate-300">
+              <div class="flex items-center justify-between mb-2">
+                <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${priorityColor}">
+                  ${card.prioridad}
+                </span>
+                <span class="text-[10px] text-slate-400 font-semibold">Func-${card.id_funcionalidad}</span>
+              </div>
+              <h5 class="text-xs font-bold text-slate-700 line-clamp-2 mb-2 leading-snug">${card.titulo}</h5>
+              
+              ${card.historia_usuario ? `
+              <p class="text-[11px] text-slate-400 italic line-clamp-2 mb-3 bg-slate-50 p-1.5 rounded border border-slate-100">
+                ${card.historia_usuario}
+              </p>
+              ` : ''}
+
+              ${card.total_subtareas > 0 ? `
+              <div>
+                <div class="flex justify-between items-center text-[10px] font-semibold text-slate-400 mb-1">
+                  <span>Subtareas (${card.completadas_subtareas}/${card.total_subtareas})</span>
+                  <span>${pctSub}%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+                  <div class="bg-emerald-500 h-1 rounded-full" style="width: ${pctSub}%"></div>
+                </div>
+              </div>
+              ` : `
+              <div class="text-[10px] text-slate-400 font-medium italic"><i class="fa-regular fa-circle-check mr-1"></i>Sin subtareas asignadas</div>
+              `}
+            </div>
+          `;
+        });
+
+        columnHtml += `
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', columnHtml);
+      });
+    }
+
+    let draggedCardId = null;
+    let originSectionId = null;
+
+    function handleDragStart(e, id, originSecId) {
+      draggedCardId = id;
+      originSectionId = originSecId;
+      e.dataTransfer.setData('text/plain', id);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      const zone = e.currentTarget;
+      zone.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      const zone = e.currentTarget;
+      zone.classList.remove('drag-over');
+    }
+
+    async function handleDrop(e, targetSecId) {
+      e.preventDefault();
+      const zone = e.currentTarget;
+      zone.classList.remove('drag-over');
+
+      if (draggedCardId && originSectionId !== targetSecId) {
+        if (state.dataMode === 'demo') {
+          const originList = demoDatabase.funcionalidades[originSectionId] || [];
+          const cardIdx = originList.findIndex(f => f.id_funcionalidad === draggedCardId);
+          if (cardIdx !== -1) {
+            const [movedCard] = originList.splice(cardIdx, 1);
+            movedCard.id_seccion = targetSecId;
+            if (!demoDatabase.funcionalidades[targetSecId]) {
+              demoDatabase.funcionalidades[targetSecId] = [];
+            }
+            demoDatabase.funcionalidades[targetSecId].push(movedCard);
+          }
+          showToast('Tarjeta reubicada localmente', 'success');
+          loadBoardDetails();
+        } else {
+          try {
+            const response = await fetch(`${API_BASE_URL}/funcionalidades/${draggedCardId}/mover`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+              },
+              body: JSON.stringify({ id_seccion: targetSecId, orden: 0 })
+            });
+
+            const resData = await response.json();
+            if (!response.ok) throw new Error(resData.error || 'Error al reubicar tarjeta');
+
+            showToast('Tablero Kanban actualizado en PostgreSQL', 'success');
+            loadBoardDetails();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+      }
+      draggedCardId = null;
+      originSectionId = null;
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function openNuevoProyectoModal() {
+      document.getElementById('nuevo-proyecto-nombre').value = '';
+      document.getElementById('nuevo-proyecto-desc').value = '';
+      const container = document.getElementById('secciones-inputs-container');
+      container.innerHTML = '';
+      
+      const defaultSections = ["Backlog", "Doing", "Completed"];
+      defaultSections.forEach(secName => {
+        addSectionInputWithValue(secName);
+      });
+      openModal('modal-nuevo-proyecto');
+    }
+
+    function addSectionInput() {
+      const container = document.getElementById('secciones-inputs-container');
+      if (container.children.length >= 6) {
+        showToast("Violación de Regla de Negocio: No puedes tener más de 6 secciones.", "error");
+        return;
+      }
+      addSectionInputWithValue('');
+    }
+
+    function addSectionInputWithValue(val) {
+      const container = document.getElementById('secciones-inputs-container');
+      const div = document.createElement('div');
+      div.className = "flex items-center space-x-2";
+      div.innerHTML = `
+        <input type="text" class="seccion-item-input flex-grow px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" placeholder="Nombre de sección (Ej. Backlog)" value="${val}">
+        <button onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700 p-1.5"><i class="fa-solid fa-trash-can"></i></button>
+      `;
+      container.appendChild(div);
+    }
+
+    async function submitNuevoProyecto() {
+      const nombre = document.getElementById('nuevo-proyecto-nombre').value;
+      const descripcion = document.getElementById('nuevo-proyecto-desc').value;
+      
+      const inputElements = document.querySelectorAll('.seccion-item-input');
+      const secciones = [];
+      inputElements.forEach(input => {
+        if (input.value.trim() !== '') {
+          secciones.push(input.value.trim());
+        }
+      });
+
+      if (!nombre) {
+        showToast('El nombre del proyecto es obligatorio.', 'error');
+        return;
+      }
+      if (secciones.length === 0) {
+        showToast('Debe configurar al menos 1 sección.', 'error');
+        return;
+      }
+      if (secciones.length > 6) {
+        showToast('No puede exceder el límite de 6 secciones.', 'error');
+        return;
+      }
+
+      if (state.dataMode === 'demo') {
+        const nuevoId = demoDatabase.proyectos.length + 1;
+        const nuevoProj = {
+          id_proyecto: nuevoId,
+          nombre,
+          descripcion,
+          fecha_creacion: new Date().toISOString(),
+          estado: 'activo',
+          id_usuario: state.currentUser.id_usuario,
+          rol_acceso: 'dueño',
+          porcentaje_avance: 0.0
+        };
+
+        demoDatabase.proyectos.push(nuevoProj);
+
+        demoDatabase.secciones[nuevoId] = [];
+        secciones.forEach((secName, idx) => {
+          const sId = nuevoId * 10 + (idx + 1);
+          demoDatabase.secciones[nuevoId].push({
+            id_seccion: sId,
+            nombre: secName,
+            orden: idx + 1,
+            id_proyecto: nuevoId
+          });
+          demoDatabase.funcionalidades[sId] = [];
+        });
+
+        showToast("Proyecto registrado de manera local", "success");
+        closeModal('modal-nuevo-proyecto');
+        loadDashboardProjects();
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/proyectos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ nombre, descripcion, secciones })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          showToast("Proyecto registrado en PostgreSQL de manera segura", "success");
+          closeModal('modal-nuevo-proyecto');
+          loadDashboardProjects();
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      }
+    }
+
+    function openAddSectionModal() {
+      if (state.dataMode === 'demo') {
+        const sections = demoDatabase.secciones[state.activeProject.id_proyecto] || [];
+        if (sections.length >= 6) {
+          showToast("Violación de Regla de Negocio: No puedes tener más de 6 secciones.", "error");
+          return;
+        }
+      }
+      document.getElementById('nueva-seccion-nombre').value = '';
+      openModal('modal-nueva-seccion');
+    }
+
+    async function submitNuevaSeccion() {
+      const nombre = document.getElementById('nueva-seccion-nombre').value;
+      if (!nombre) return;
+
+      if (state.dataMode === 'demo') {
+        const projId = state.activeProject.id_proyecto;
+        if (!demoDatabase.secciones[projId]) demoDatabase.secciones[projId] = [];
+        
+        const sections = demoDatabase.secciones[projId];
+        if (sections.length >= 6) {
+          showToast("Violación de Regla de Negocio: Límite de 6 columnas alcanzado.", "error");
+          return;
+        }
+
+        const nuevaSec = {
+          id_seccion: Math.floor(Math.random() * 1000) + 100,
+          nombre,
+          orden: sections.length + 1,
+          id_proyecto: projId
+        };
+        sections.push(nuevaSec);
+        demoDatabase.funcionalidades[nuevaSec.id_seccion] = [];
+        
+        showToast("Sección insertada", "success");
+        closeModal('modal-nueva-seccion');
+        loadBoardDetails();
+      } else {
+        try {
+          const sections = document.getElementById('board-kanban-columns').children.length;
+          const response = await fetch(`${API_BASE_URL}/secciones`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({
+              nombre,
+              orden: sections + 1,
+              id_proyecto: state.activeProject.id_proyecto
+            })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          showToast("Sección creada en PostgreSQL", "success");
+          closeModal('modal-nueva-seccion');
+          loadBoardDetails();
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      }
+    }
+
+    async function eliminarSeccion(idSec) {
+      if (state.dataMode === 'demo') {
+        const projId = state.activeProject.id_proyecto;
+        const sections = demoDatabase.secciones[projId] || [];
+        
+        if (sections.length <= 1) {
+          showToast("Violación de Regla de Negocio: No puedes dejar el proyecto sin secciones.", "error");
+          return;
+        }
+
+        const index = sections.findIndex(s => s.id_seccion === idSec);
+        if (index !== -1) {
+          sections.splice(index, 1);
+          delete demoDatabase.funcionalidades[idSec];
+          showToast("Sección removida", "success");
+          loadBoardDetails();
+        }
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/secciones/${idSec}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${state.token}` }
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          showToast("Sección removida de la base de datos", "success");
+          loadBoardDetails();
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      }
+    }
+
+    function openAddCardModal(idSeccion) {
+      document.getElementById('nueva-tarjeta-seccion-id').value = idSeccion;
+      document.getElementById('nueva-tarjeta-titulo').value = '';
+      document.getElementById('nueva-tarjeta-historia').value = '';
+      document.getElementById('nueva-tarjeta-desc').value = '';
+      openModal('modal-nueva-tarjeta');
+    }
+
+    async function submitNuevaTarjeta() {
+      const idSec = parseInt(document.getElementById('nueva-tarjeta-seccion-id').value);
+      const titulo = document.getElementById('nueva-tarjeta-titulo').value;
+      const historia = document.getElementById('nueva-tarjeta-historia').value;
+      const desc = document.getElementById('nueva-tarjeta-desc').value;
+      const prioridad = document.getElementById('nueva-tarjeta-prioridad').value;
+
+      if (!titulo) return;
+
+      if (state.dataMode === 'demo') {
+        const nuevoId = Math.floor(Math.random() * 10000) + 100;
+        const nuevaCard = {
+          id_funcionalidad: nuevoId,
+          titulo,
+          historia_usuario: historia,
+          descripcion_detallada: desc,
+          prioridad,
+          orden: 0,
+          id_seccion: idSec
+        };
+
+        if (!demoDatabase.funcionalidades[idSec]) {
+          demoDatabase.funcionalidades[idSec] = [];
+        }
+        demoDatabase.funcionalidades[idSec].push(nuevaCard);
+
+        showToast("Tarjeta agregada localmente", "success");
+        closeModal('modal-nueva-tarjeta');
+        loadBoardDetails();
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/funcionalidades`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({
+              titulo,
+              historia_usuario: historia,
+              descripcion_detallada: desc,
+              prioridad,
+              orden: 0,
+              id_seccion: idSec
+            })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          showToast("Historia de usuario registrada en PostgreSQL", "success");
+          closeModal('modal-nueva-tarjeta');
+          loadBoardDetails();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    async function openCardDetailModal(cardId) {
+      state.activeCard = cardId;
+      document.getElementById('detalle-tarjeta-id').value = cardId;
+
+      if (state.dataMode === 'demo') {
+        let foundCard = null;
+        Object.keys(demoDatabase.funcionalidades).forEach(key => {
+          const list = demoDatabase.funcionalidades[key];
+          const found = list.find(f => f.id_funcionalidad === cardId);
+          if (found) foundCard = found;
+        });
+
+        if (!foundCard) return;
+
+        state.activeCardDetails = {
+          ...foundCard,
+          subtareas: demoDatabase.subtareas[cardId] || [],
+          notas_diseno: demoDatabase.notas_diseno[cardId] || [],
+          fragmentos_codigo: demoDatabase.fragmentos_codigo[cardId] || [],
+          decisiones_tecnicas: demoDatabase.decisiones_tecnicas[cardId] || []
+        };
+        renderCardDetails();
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/funcionalidades/${cardId}`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+          });
+          if (!response.ok) throw new Error('No se pudo cargar la ficha completa de la tarjeta');
+          state.activeCardDetails = await response.json();
+          renderCardDetails();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+      openModal('modal-detalle-tarjeta');
+    }
+
+    function renderCardDetails() {
+      const details = state.activeCardDetails;
+      if (!details) return;
+
+      document.getElementById('detalle-titulo').innerText = details.titulo;
+      document.getElementById('detalle-codigo-id').innerText = details.id_funcionalidad;
+      document.getElementById('detalle-historia').innerText = details.historia_usuario || "No definida.";
+      document.getElementById('detalle-descripcion').innerText = details.descripcion_detallada || "Sin especificaciones técnicas registradas.";
+
+      const priBadge = document.getElementById('detalle-prioridad');
+      priBadge.innerText = details.prioridad;
+      if (details.prioridad === 'alta') priBadge.className = 'inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100';
+      else if (details.prioridad === 'media') priBadge.className = 'inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-100';
+      else priBadge.className = 'inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-sky-50 text-sky-600 border border-sky-100';
+
+      renderSubtareasList();
+
+      renderTabDetails('diseno');
+      renderTabDetails('codigo');
+      renderTabDetails('decisiones');
+      switchTab('diseno');
+    }
+
+    function renderSubtareasList() {
+      const subs = state.activeCardDetails.subtareas || [];
+      const listContainer = document.getElementById('detalle-subtareas-list');
+      listContainer.innerHTML = '';
+
+      const total = subs.length;
+      const completadas = subs.filter(s => s.completada).length;
+      const pct = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+      document.getElementById('detalle-subtareas-avance').innerText = `${completadas}/${total} (${pct}%)`;
+      document.getElementById('detalle-subtareas-progreso-bar').style.width = `${pct}%`;
+
+      if (total === 0) {
+        listContainer.innerHTML = '<p class="text-xs text-slate-400 italic">No hay subtareas de control registradas.</p>';
+        return;
+      }
+
+      subs.forEach(s => {
+        listContainer.insertAdjacentHTML('beforeend', `
+          <div class="flex items-center justify-between bg-slate-50 border border-slate-200/50 p-2.5 rounded-xl">
+            <label class="flex items-center space-x-3 cursor-pointer text-xs font-medium text-slate-700">
+              <input type="checkbox" onchange="toggleSubtarea(${s.id_subtarea}, this.checked)" ${s.completada ? 'checked' : ''} class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
+              <span class="${s.completada ? 'line-through text-slate-400' : ''}">${s.descripcion}</span>
+            </label>
+          </div>
+        `);
+      });
+    }
+
+    async function toggleSubtarea(subId, isChecked) {
+      if (state.dataMode === 'demo') {
+        const sub = state.activeCardDetails.subtareas.find(s => s.id_subtarea === subId);
+        if (sub) {
+          sub.completada = isChecked;
+          renderSubtareasList();
+          loadBoardDetails();
+        }
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/subtareas/${subId}/toggle`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ completada: isChecked })
+          });
+          if (!response.ok) throw new Error('No se pudo actualizar la subtarea');
+          
+          const sub = state.activeCardDetails.subtareas.find(s => s.id_subtarea === subId);
+          if (sub) sub.completada = isChecked;
+
+          renderSubtareasList();
+          loadBoardDetails();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    async function submitNuevaSubtarea() {
+      const desc = document.getElementById('nueva-subtarea-input').value;
+      if (!desc) return;
+
+      if (state.dataMode === 'demo') {
+        const nuevoId = Math.floor(Math.random() * 1000) + 1;
+        const nuevaSub = {
+          id_subtarea: nuevoId,
+          descripcion: desc,
+          completada: false,
+          orden: state.activeCardDetails.subtareas.length + 1,
+          id_funcionalidad: state.activeCard
+        };
+
+        state.activeCardDetails.subtareas.push(nuevaSub);
+        if (!demoDatabase.subtareas[state.activeCard]) {
+          demoDatabase.subtareas[state.activeCard] = [];
+        }
+        demoDatabase.subtareas[state.activeCard].push(nuevaSub);
+
+        document.getElementById('nueva-subtarea-input').value = '';
+        renderSubtareasList();
+        loadBoardDetails();
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/funcionalidades/${state.activeCard}/subtareas`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({
+              descripcion: desc,
+              orden: state.activeCardDetails.subtareas.length + 1
+            })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          state.activeCardDetails.subtareas.push(data);
+          document.getElementById('nueva-subtarea-input').value = '';
+          renderSubtareasList();
+          loadBoardDetails();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.add('border-transparent', 'text-slate-500');
+        btn.classList.remove('border-indigo-500', 'text-indigo-600');
+      });
+
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.add('hidden'));
+
+      const btn = document.getElementById(`tab-${tabId}`);
+      btn.classList.remove('border-transparent', 'text-slate-500');
+      btn.classList.add('border-indigo-500', 'text-indigo-600');
+
+      document.getElementById(`pane-${tabId}`).classList.remove('hidden');
+    }
+
+    function renderTabDetails(tabId) {
+      if (tabId === 'diseno') {
+        const container = document.getElementById('list-notas-diseno');
+        container.innerHTML = '';
+        const data = state.activeCardDetails.notas_diseno || [];
+        if (data.length === 0) {
+          container.innerHTML = '<p class="text-[11px] text-slate-400 italic">No hay notas de diseño registradas.</p>';
+          return;
+        }
+        data.forEach(n => {
+          container.insertAdjacentHTML('beforeend', `
+            <div class="bg-indigo-50/20 p-2.5 rounded-lg border border-indigo-100/30">
+              <p class="text-xs text-slate-600">${n.contenido}</p>
+              <span class="text-[10px] text-slate-400 block mt-1"><i class="fa-regular fa-clock mr-1"></i>${n.fecha ? new Date(n.fecha).toLocaleDateString() : 'Reciente'}</span>
+            </div>
+          `);
+        });
+      } else if (tabId === 'codigo') {
+        const container = document.getElementById('list-fragmentos-codigo');
+        container.innerHTML = '';
+        const data = state.activeCardDetails.fragmentos_codigo || [];
+        if (data.length === 0) {
+          container.innerHTML = '<p class="text-[11px] text-slate-400 italic">No hay fragmentos de código registrados.</p>';
+          return;
+        }
+        data.forEach(f => {
+          container.insertAdjacentHTML('beforeend', `
+            <div class="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[10px]">
+              <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1.5 mb-2 font-sans font-semibold">
+                <span>${f.descripcion || 'Snippet'}</span>
+                <span class="text-emerald-400 uppercase text-[9px]">${f.lenguaje}</span>
+              </div>
+              <pre class="overflow-x-auto"><code>${f.codigo}</code></pre>
+            </div>
+          `);
+        });
+      } else if (tabId === 'decisiones') {
+        const container = document.getElementById('list-decisiones-tecnicas');
+        container.innerHTML = '';
+        const data = state.activeCardDetails.decisiones_tecnicas || [];
+        if (data.length === 0) {
+          container.innerHTML = '<p class="text-[11px] text-slate-400 italic">No se han justificado decisiones arquitectónicas.</p>';
+          return;
+        }
+        data.forEach(d => {
+          container.insertAdjacentHTML('beforeend', `
+            <div class="bg-amber-50/20 p-2.5 rounded-lg border border-amber-100/30">
+              <h6 class="text-xs font-bold text-slate-700">${d.descripcion}</h6>
+              <p class="text-xs text-slate-500 mt-1 italic">"Justificación: ${d.justificacion}"</p>
+              <span class="text-[10px] text-slate-400 block mt-1"><i class="fa-regular fa-clock mr-1"></i>${d.fecha ? new Date(d.fecha).toLocaleDateString() : 'Reciente'}</span>
+            </div>
+          `);
+        });
+      }
+    }
+
+    async function submitNuevaNota() {
+      const contenido = document.getElementById('nueva-nota-contenido').value;
+      if (!contenido) return;
+
+      if (state.dataMode === 'demo') {
+        const nuevaNota = {
+          id_nota: Math.floor(Math.random() * 1000) + 1,
+          contenido,
+          fecha: new Date().toISOString(),
+          id_funcionalidad: state.activeCard
+        };
+        state.activeCardDetails.notas_diseno.unshift(nuevaNota);
+        if (!demoDatabase.notas_diseno[state.activeCard]) demoDatabase.notas_diseno[state.activeCard] = [];
+        demoDatabase.notas_diseno[state.activeCard].unshift(nuevaNota);
+
+        document.getElementById('nueva-nota-contenido').value = '';
+        renderTabDetails('diseno');
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/funcionalidades/${state.activeCard}/notas`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ contenido })
+          });
+          const data = await response.json();
+          state.activeCardDetails.notas_diseno.unshift(data);
+          document.getElementById('nueva-nota-contenido').value = '';
+          renderTabDetails('diseno');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    async function submitNuevoFragmento() {
+      const descripcion = document.getElementById('nuevo-fragmento-descripcion').value;
+      const lenguaje = document.getElementById('nuevo-fragmento-lenguaje').value;
+      const codigo = document.getElementById('nuevo-fragmento-codigo').value;
+
+      if (!codigo || !descripcion) return;
+
+      if (state.dataMode === 'demo') {
+        const nuevoFrag = {
+          id_fragmento: Math.floor(Math.random() * 1000) + 1,
+          lenguaje,
+          codigo,
+          descripcion,
+          id_funcionalidad: state.activeCard
+        };
+        state.activeCardDetails.fragmentos_codigo.unshift(nuevoFrag);
+        if (!demoDatabase.fragmentos_codigo[state.activeCard]) demoDatabase.fragmentos_codigo[state.activeCard] = [];
+        demoDatabase.fragmentos_codigo[state.activeCard].unshift(nuevoFrag);
+
+        document.getElementById('nuevo-fragmento-descripcion').value = '';
+        document.getElementById('nuevo-fragmento-codigo').value = '';
+        renderTabDetails('codigo');
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/funcionalidades/${state.activeCard}/fragmentos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ lenguaje, codigo, descripcion })
+          });
+          const data = await response.json();
+          state.activeCardDetails.fragmentos_codigo.unshift(data);
+          document.getElementById('nuevo-fragmento-descripcion').value = '';
+          document.getElementById('nuevo-fragmento-codigo').value = '';
+          renderTabDetails('codigo');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    async function submitNuevaDecision() {
+      const descripcion = document.getElementById('nueva-decision-titulo').value;
+      const justificacion = document.getElementById('nueva-decision-justificacion').value;
+
+      if (!descripcion || !justificacion) return;
+
+      if (state.dataMode === 'demo') {
+        const nuevaDec = {
+          id_decision: Math.floor(Math.random() * 1000) + 1,
+          descripcion,
+          justificacion,
+          fecha: new Date().toISOString(),
+          id_funcionalidad: state.activeCard
+        };
+        state.activeCardDetails.decisiones_tecnicas.unshift(nuevaDec);
+        if (!demoDatabase.decisiones_tecnicas[state.activeCard]) demoDatabase.decisiones_tecnicas[state.activeCard] = [];
+        demoDatabase.decisiones_tecnicas[state.activeCard].unshift(nuevaDec);
+
+        document.getElementById('nueva-decision-titulo').value = '';
+        document.getElementById('nueva-decision-justificacion').value = '';
+        renderTabDetails('decisiones');
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/funcionalidades/${state.activeCard}/decisiones`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ descripcion, justificacion })
+          });
+          const data = await response.json();
+          state.activeCardDetails.decisiones_tecnicas.unshift(data);
+          document.getElementById('nueva-decision-titulo').value = '';
+          document.getElementById('nueva-decision-justificacion').value = '';
+          renderTabDetails('decisiones');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    }
+
+    async function openCollaboratorsModal() {
+      const container = document.getElementById('colaboradores-lista-container');
+      container.innerHTML = '';
+
+      let colaboradores = [];
+      const projId = state.activeProject.id_proyecto;
+
+      if (state.dataMode === 'demo') {
+        colaboradores = demoDatabase.colaboradores[projId] || [];
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/proyectos/${projId}/colaboradores`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+          });
+          if (!response.ok) throw new Error('Error al listar colaboradores');
+          colaboradores = await response.json();
+        } catch (err) {
+          showToast(err.message, 'error');
+          return;
+        }
+      }
+
+      if (colaboradores.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic">No hay colaboradores adicionales en el proyecto.</p>';
+      } else {
+        colaboradores.forEach(c => {
+          container.insertAdjacentHTML('beforeend', `
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+              <div>
+                <h5 class="text-xs font-bold text-slate-800">${c.nombre}</h5>
+                <span class="text-[10px] text-slate-400">${c.email} &bull; Rol: ${c.rol_colaborador}</span>
+              </div>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${c.rol_colaborador === 'editor' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}">
+                ${c.rol_colaborador}
+              </span>
+            </div>
+          `);
+        });
+      }
+
+      openModal('modal-colaboradores');
+    }
+
+    async function submitColaborador() {
+      const email = document.getElementById('colaborador-email').value;
+      const rol_colaborador = document.getElementById('colaborador-rol-acceso').value;
+      const projId = state.activeProject.id_proyecto;
+
+      if (!email) return;
+
+      if (state.dataMode === 'demo') {
+        const originalProj = demoDatabase.proyectos.find(p => p.id_proyecto === projId);
+        const ownerUser = demoDatabase.usuarios.find(u => u.id_usuario === originalProj.id_usuario);
+        
+        if (email === ownerUser.email) {
+          showToast(`Violación de Regla de Negocio: El dueño del proyecto no puede agregarse como colaborador.`, "error");
+          return;
+        }
+
+        const target = demoDatabase.usuarios.find(u => u.email === email);
+        if (!target) {
+          showToast("No se encontró ningún usuario registrado con ese correo.", "error");
+          return;
+        }
+
+        const nuevoColab = {
+          id_usuario: target.id_usuario,
+          nombre: target.nombre,
+          email: target.email,
+          rol_colaborador,
+          fecha_union: new Date().toISOString()
+        };
+
+        if (!demoDatabase.colaboradores[projId]) demoDatabase.colaboradores[projId] = [];
+        
+        const exists = demoDatabase.colaboradores[projId].some(c => c.id_usuario === target.id_usuario);
+        if (exists) {
+          showToast("Este usuario ya es un colaborador registrado.", "error");
+          return;
+        }
+
+        demoDatabase.colaboradores[projId].push(nuevoColab);
+
+        showToast("Colaborador agregado al proyecto con éxito", "success");
+        document.getElementById('colaborador-email').value = '';
+        openCollaboratorsModal();
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/proyectos/${projId}/colaboradores`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ email, rol_colaborador })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          showToast("Colaborador asignado correctamente", "success");
+          document.getElementById('colaborador-email').value = '';
+          openCollaboratorsModal();
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+      }
+    }
+  </script>
+</body>
+</html>
