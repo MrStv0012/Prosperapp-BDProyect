@@ -2,9 +2,10 @@
 -- ProsperApp - DDL
 -- Proyecto final - Bases de Datos
 --
--- Este script crea las 8 tablas del sistema. La idea general es:
--- un Usuario tiene Proyectos, cada Proyecto tiene un tablero con
--- Secciones (como Backlog, Doing, Completed...), cada Seccion tiene
+-- Este script crea las 9 tablas del sistema. La idea general es:
+-- un Usuario tiene Proyectos (y puede colaborar en proyectos de otros
+-- usuarios via colaborador_proyecto), cada Proyecto tiene un tablero
+-- con Secciones (como Backlog, Doing, Completed...), cada Seccion tiene
 -- Funcionalidades (las tarjetas/historias de usuario), y cada
 -- Funcionalidad puede tener varias Subtareas, Notas de diseño,
 -- Fragmentos de codigo y Decisiones tecnicas.
@@ -41,10 +42,10 @@ CREATE TABLE usuario (
 
 -- =====================================================================
 -- 2. PROYECTO
--- Cada proyecto le pertenece a un unico usuario (por eso la FK
--- id_usuario). Decidimos no agregar colaboradores
--- para mantener el modelo simple, ya que ProsperApp
--- esta pensado para proyectos personales de una sola persona.
+---- Cada proyecto le pertenece a un unico usuario dueño/creador (por
+-- eso la FK id_usuario). Los colaboradores adicionales se manejan
+-- aparte en la tabla colaborador_proyecto (ver seccion 2.1), para
+-- no perder la nocion de quien es el dueño original del proyecto.
 -- =====================================================================
 CREATE TABLE proyecto (
     id_proyecto     SERIAL PRIMARY KEY,
@@ -258,12 +259,12 @@ CREATE TRIGGER trg_min_secciones
 -- frecuentes filtrando por estas columnas, y un indice hace que esas
 -- busquedas sean mucho mas rapidas cuando haya muchos datos.
 -- =====================================================================
-CREATE INDEX idx_proyecto_usuario ON proyecto(id_usuario);
-CREATE INDEX idx_seccion_proyecto ON seccion(id_proyecto);
-CREATE INDEX idx_colaborador_usuario ON colaborador_proyecto(id_usuario);
-CREATE INDEX idx_funcionalidad_seccion ON funcionalidad(id_seccion);
-CREATE INDEX idx_subtarea_funcionalidad ON subtarea(id_funcionalidad);
-CREATE INDEX IF NOT EXISTS idx_nota_funcionalidad       ON nota_diseno(id_funcionalidad);
-CREATE INDEX IF NOT EXISTS idx_fragmento_funcionalidad  ON fragmento_codigo(id_funcionalidad);
-CREATE INDEX IF NOT EXISTS idx_decision_funcionalidad   ON decision_tecnica(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_proyecto_usuario ON proyecto(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_seccion_proyecto ON seccion(id_proyecto);
+CREATE INDEX IF NOT EXISTS idx_colaborador_usuario ON colaborador_proyecto(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_funcionalidad_seccion ON funcionalidad(id_seccion);
+CREATE INDEX IF NOT EXISTS idx_subtarea_funcionalidad ON subtarea(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_nota_funcionalidad ON nota_diseno(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_fragmento_funcionalidad ON fragmento_codigo(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_decision_funcionalidad ON decision_tecnica(id_funcionalidad);
  
