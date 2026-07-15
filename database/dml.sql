@@ -116,3 +116,16 @@ INSERT INTO fragmento_codigo (lenguaje, codigo, descripcion, id_funcionalidad) V
 INSERT INTO decision_tecnica (descripcion, justificacion, id_funcionalidad) VALUES
 ('Usar PostgreSQL como motor de base de datos.', 'Soporta triggers, CHECK constraints avanzados y es gratuito, ideal para el alcance del curso.', 1),
 ('Separar notas, código y decisiones en tablas propias en vez de columnas de texto.', 'Permite guardar varios registros de cada tipo por funcionalidad y cumple con la Primera Forma Normal (1FN).', 2);
+
+-- =====================================================================
+-- 9. COLABORADOR_PROYECTO (algunos proyectos tienen colaboradores)
+-- Recordatorio de quien es dueno de que (columna id_usuario en proyecto):
+--   Proyecto 1 (ProsperApp)              -> dueno: Jefferson (1)
+--   Proyecto 2 (Bot de Telegram)         -> dueno: Jefferson (1)
+--   Proyecto 3 (Portafolio personal)     -> dueno: Camila (2)
+--   Proyecto 4 (API de finanzas)         -> dueno: Andrés (3)
+-- =====================================================================
+INSERT INTO colaborador_proyecto (id_proyecto, id_usuario, rol_colaborador) VALUES
+(1, 2, 'editor'),   -- Camila colabora como editora en ProsperApp (dueno: Jefferson)
+(1, 3, 'lector'),   -- Andrés colabora como lector en ProsperApp (dueno: Jefferson)
+(4, 1, 'editor');   -- Jefferson colabora como editor en la API de finanzas (dueno: Andrés)
