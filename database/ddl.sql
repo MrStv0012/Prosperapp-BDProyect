@@ -19,6 +19,7 @@ DROP TABLE IF EXISTS nota_diseno CASCADE;
 DROP TABLE IF EXISTS subtarea CASCADE;
 DROP TABLE IF EXISTS funcionalidad CASCADE;
 DROP TABLE IF EXISTS seccion CASCADE;
+DROP TABLE IF EXISTS colaborador_proyecto CASCADE;
 DROP TABLE IF EXISTS proyecto CASCADE;
 DROP TABLE IF EXISTS usuario CASCADE;
 
@@ -55,6 +56,52 @@ CREATE TABLE proyecto (
     id_usuario      INT NOT NULL REFERENCES usuario(id_usuario)
                         ON DELETE CASCADE
 );
+
+-- =====================================================================
+-- 2.1 COLABORADOR_PROYECTO (tabla puente para colaboradores)
+-- Relacion muchos a muchos: un usuario puede colaborar en varios
+-- proyectos y un proyecto puede tener varios colaboradores.
+-- El dueño del proyecto sigue siendo proyecto.id_usuario; esta tabla
+-- es solo para colaboradores adicionales invitados por el dueño.
+-- =====================================================================
+CREATE TABLE colaborador_proyecto (
+    id_proyecto      INT NOT NULL REFERENCES proyecto(id_proyecto)
+                         ON DELETE CASCADE,
+    id_usuario       INT NOT NULL REFERENCES usuario(id_usuario)
+                         ON DELETE CASCADE,
+    rol_colaborador  VARCHAR(20) NOT NULL DEFAULT 'editor'
+                         CHECK (rol_colaborador IN ('editor', 'lector')),
+    fecha_union      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_proyecto, id_usuario)
+);
+
+-- =====================================================================
+-- TRIGGER_COLABORADOR: impedir que el dueño de un proyecto se agregue a si mismo
+-- como colaborador. El dueño ya tiene acceso total por ser
+-- proyecto.id_usuario; no tiene sentido que tambien aparezca como
+-- fila en colaborador_proyecto.
+-- =====================================================================
+CREATE OR REPLACE FUNCTION validar_no_autoinvitar()
+RETURNS TRIGGER AS $$
+DECLARE
+    id_dueno INT;
+BEGIN
+    SELECT id_usuario INTO id_dueno
+    FROM proyecto
+    WHERE id_proyecto = NEW.id_proyecto;
+
+    IF NEW.id_usuario = id_dueno THEN
+        RAISE EXCEPTION 'El dueño del proyecto (usuario %) no puede agregarse como colaborador', id_dueno;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_no_autoinvitar
+    BEFORE INSERT ON colaborador_proyecto
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_no_autoinvitar();
 
 -- =====================================================================
 -- 3. SECCION (las columnas del tablero: Backlog, Doing, Completed...)
@@ -155,7 +202,7 @@ CREATE TABLE decision_tecnica (
 );
 
 -- =====================================================================
--- TRIGGER_1: limitar cada proyecto a un maximo de 6 secciones
+-- TRIGGER_MAX_SECCIONES: limitar cada proyecto a un maximo de 6 secciones
 -- =====================================================================
 CREATE OR REPLACE FUNCTION validar_max_secciones()
 RETURNS TRIGGER AS $$
@@ -180,7 +227,7 @@ CREATE TRIGGER trg_max_secciones
     EXECUTE FUNCTION validar_max_secciones();
 
 -- =====================================================================
--- TRIGGER_2: limitar cada proyecto a un minimo de 1 seccion
+-- TRIGGER_MIN_SECCIONES: limitar cada proyecto a un minimo de 1 seccion
 -- =====================================================================
 
 CREATE OR REPLACE FUNCTION validar_min_secciones()
@@ -213,6 +260,7 @@ CREATE TRIGGER trg_min_secciones
 -- =====================================================================
 CREATE INDEX idx_proyecto_usuario ON proyecto(id_usuario);
 CREATE INDEX idx_seccion_proyecto ON seccion(id_proyecto);
+CREATE INDEX idx_colaborador_usuario ON colaborador_proyecto(id_usuario);
 CREATE INDEX idx_funcionalidad_seccion ON funcionalidad(id_seccion);
 CREATE INDEX idx_subtarea_funcionalidad ON subtarea(id_funcionalidad);
 CREATE INDEX IF NOT EXISTS idx_nota_funcionalidad       ON nota_diseno(id_funcionalidad);
