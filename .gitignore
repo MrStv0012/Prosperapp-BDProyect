@@ -1,0 +1,9 @@
+# Dependencias de Node (se reinstalan con "npm install", no se versionan)
+node_modules/
+
+# Variables de entorno reales (contienen credenciales, nunca a GitHub)
+.env
+
+# Volumen de datos de Postgres si en algun momento se genera localmente
+# fuera de Docker (Docker ya maneja su propio volumen aparte)
+*.log
