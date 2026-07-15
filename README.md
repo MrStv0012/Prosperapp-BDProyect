@@ -21,17 +21,21 @@ Cada proyecto se representa como un tablero compuesto por secciones (columnas de
 ---
 
 ## 🗄️ Diseño de la Base de Datos
-La persistencia de datos se maneja mediante un motor relacional **PostgreSQL**. El esquema consta de 8 tablas principales relacionadas entre sí:
+La persistencia de datos se maneja mediante un motor relacional **PostgreSQL**. El esquema consta de 9 tablas principales relacionadas entre sí:
 
-1.  **`usuario`**: Registro de usuarios y roles básicos ('admin', 'usuario').
-2.  **`proyecto`**: Información del proyecto y su respectivo dueño.
-3.  **`seccion`**: Columnas configurables asociadas a un proyecto específico.
-4.  **`funcionalidad`**: Tarjeta o historia de usuario dentro de una sección.
-5.  **`subtarea`**: Checklist detallado para cada funcionalidad.
-6.  **`nota_diseno`**: Notas de diseño de arquitectura o interfaz.
-7.  **`fragmento_codigo`**: Snippets de código asociados a las soluciones técnicas.
-8.  **`decision_tecnica`**: Historial de decisiones tomadas y su respectiva justificación.
+1.  **`usuario`**: Registro de usuarios y roles básicos de la plataforma ('admin', 'usuario').
+2.  **`proyecto`**: Información del proyecto y su respectivo dueño (creador).
+3.  **`colaborador_proyecto`**: Tabla puente que permite que un proyecto tenga colaboradores adicionales al dueño, cada uno con un rol local al proyecto ('editor', 'lector').
+4.  **`seccion`**: Columnas configurables asociadas a un proyecto específico.
+5.  **`funcionalidad`**: Tarjeta o historia de usuario dentro de una sección.
+6.  **`subtarea`**: Checklist detallado para cada funcionalidad.
+7.  **`nota_diseno`**: Notas de diseño de arquitectura o interfaz.
+8.  **`fragmento_codigo`**: Snippets de código asociados a las soluciones técnicas.
+9.  **`decision_tecnica`**: Historial de decisiones tomadas y su respectiva justificación.
 
 ### Triggers y Restricciones Relevantes
 *   **Restricción de orden único**: Se implementó una restricción única compuesta (`uq_seccion_orden`) en la tabla `seccion` para garantizar que un mismo proyecto no posea dos columnas con el mismo número de orden asignado.
-*   **Trigger de límite de secciones (`trg_max_secciones`)**: Dado que una validación `CHECK` estándar no puede evaluar registros de otras filas, se implementó una función y un disparador `BEFORE INSERT` que cuenta el número de secciones existentes en el proyecto antes de permitir el registro de una nueva, previniendo exceder el límite establecido de seis (6) secciones.
+*   **Restricciones de orden no negativo**: Las columnas `orden` de `seccion`, `funcionalidad` y `subtarea` cuentan con validaciones `CHECK` que impiden guardar valores negativos (y, en el caso de `seccion`, tampoco permiten cero).
+*   **Trigger de límite máximo de secciones (`trg_max_secciones`)**: Dado que una validación `CHECK` estándar no puede evaluar registros de otras filas, se implementó una función y un disparador `BEFORE INSERT` que cuenta el número de secciones existentes en el proyecto antes de permitir el registro de una nueva, previniendo exceder el límite establecido de seis (6) secciones.
+*   **Trigger de límite mínimo de secciones (`trg_min_secciones`)**: De forma complementaria, un disparador `BEFORE DELETE` impide eliminar la última sección restante de un proyecto, garantizando que siempre exista al menos una (1) sección.
+*   **Trigger de anti-autoinvitación (`trg_no_autoinvitar`)**: Al agregar la posibilidad de que un proyecto tenga colaboradores, se implementó un disparador `BEFORE INSERT` sobre `colaborador_proyecto` que impide que el dueño del proyecto se agregue a sí mismo como colaborador, ya que este ya cuenta con acceso total al ser el creador (`proyecto.id_usuario`).
