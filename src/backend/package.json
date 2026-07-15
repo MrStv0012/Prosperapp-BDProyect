@@ -1,0 +1,18 @@
+{
+  "name": "prosperapp-backend",
+  "version": "1.0.0",
+  "description": "Backend de ProsperApp (Express + PostgreSQL)",
+  "main": "backend_express_api.js",
+  "scripts": {
+    "start": "node backend_express_api.js",
+    "dev": "node --watch backend_express_api.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  }
+}
