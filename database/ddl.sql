@@ -70,7 +70,7 @@ CREATE TABLE proyecto (
 CREATE TABLE seccion (
     id_seccion      SERIAL PRIMARY KEY,
     nombre          VARCHAR(50) NOT NULL,
-    orden           INT NOT NULL, 
+    orden           INT NOT NULL CHECK (orden > 0), 
     id_proyecto     INT NOT NULL REFERENCES proyecto(id_proyecto)
                         ON DELETE CASCADE,
     CONSTRAINT uq_seccion_orden UNIQUE (id_proyecto, orden)
@@ -93,7 +93,7 @@ CREATE TABLE funcionalidad (
     descripcion_detallada TEXT,
     prioridad            VARCHAR(20) DEFAULT 'media'
                              CHECK (prioridad IN ('alta', 'media', 'baja')),
-    orden                INT NOT NULL DEFAULT 0,  -- posicion de la tarjeta dentro de su columna
+    orden                INT NOT NULL DEFAULT 0 CHECK (orden >= 0),  -- posicion de la tarjeta dentro de su columna
     fecha_creacion       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     id_seccion           INT NOT NULL REFERENCES seccion(id_seccion)
                              ON DELETE CASCADE
@@ -106,7 +106,7 @@ CREATE TABLE subtarea (
     id_subtarea      SERIAL PRIMARY KEY,
     descripcion      VARCHAR(255) NOT NULL,
     completada       BOOLEAN NOT NULL DEFAULT FALSE, 
-    orden            INT NOT NULL DEFAULT 0,
+    orden            INT NOT NULL DEFAULT 0 CHECK (orden >= 0),
     id_funcionalidad INT NOT NULL REFERENCES funcionalidad(id_funcionalidad)
                          ON DELETE CASCADE
 );
@@ -155,7 +155,7 @@ CREATE TABLE decision_tecnica (
 );
 
 -- =====================================================================
--- TRIGGER: limitar cada proyecto a un maximo de 6 secciones
+-- TRIGGER_1: limitar cada proyecto a un maximo de 6 secciones
 -- =====================================================================
 CREATE OR REPLACE FUNCTION validar_max_secciones()
 RETURNS TRIGGER AS $$
@@ -180,6 +180,32 @@ CREATE TRIGGER trg_max_secciones
     EXECUTE FUNCTION validar_max_secciones();
 
 -- =====================================================================
+-- TRIGGER_2: limitar cada proyecto a un minimo de 1 seccion
+-- =====================================================================
+
+CREATE OR REPLACE FUNCTION validar_min_secciones()
+RETURNS TRIGGER AS $$
+DECLARE
+    total_secciones INT;
+BEGIN
+    SELECT COUNT(*) INTO total_secciones
+    FROM seccion
+    WHERE id_proyecto = OLD.id_proyecto;
+
+    IF total_secciones <= 1 THEN
+        RAISE EXCEPTION 'Un proyecto no puede quedar sin secciones (minimo 1 requerido, id_proyecto=%)', OLD.id_proyecto;
+    END IF;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_min_secciones
+    BEFORE DELETE ON seccion
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_min_secciones();
+
+-- =====================================================================
 -- INDICES: estos no son obligatorios para que el modelo funcione,
 -- pero los agrego porque el dashboard va a hacer consultas
 -- frecuentes filtrando por estas columnas, y un indice hace que esas
@@ -189,3 +215,7 @@ CREATE INDEX idx_proyecto_usuario ON proyecto(id_usuario);
 CREATE INDEX idx_seccion_proyecto ON seccion(id_proyecto);
 CREATE INDEX idx_funcionalidad_seccion ON funcionalidad(id_seccion);
 CREATE INDEX idx_subtarea_funcionalidad ON subtarea(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_nota_funcionalidad       ON nota_diseno(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_fragmento_funcionalidad  ON fragmento_codigo(id_funcionalidad);
+CREATE INDEX IF NOT EXISTS idx_decision_funcionalidad   ON decision_tecnica(id_funcionalidad);
+ 
