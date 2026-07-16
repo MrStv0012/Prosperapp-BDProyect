@@ -264,6 +264,50 @@ app.post('/api/proyectos', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/proyectos/:id
+// Elimina un proyecto completo (y en cascada, todas sus secciones,
+// funcionalidades, subtareas, notas, fragmentos de codigo, decisiones
+// tecnicas y colaboradores, gracias a los ON DELETE CASCADE del DDL).
+//
+// A diferencia de otras rutas, aqui NO se usa verificarAccesoProyecto,
+// porque ese middleware permite tanto al dueño como a los colaboradores
+// (editor/lector). Borrar un proyecto es una accion destructiva que
+// solo debe poder hacer el DUEÑO -- un colaborador, aunque sea
+// "editor", no deberia poder eliminar el proyecto completo de otra
+// persona. Por eso la validacion de dueño se hace aqui mismo, filtrando
+// directamente por id_usuario en el DELETE.
+app.delete('/api/proyectos/:id', authenticateToken, async (req, res) => {
+  const idProyecto = req.params.id;
+  const userId = req.user.id_usuario;
+
+  try {
+    const query = `
+      DELETE FROM proyecto
+      WHERE id_proyecto = $1 AND id_usuario = $2
+      RETURNING id_proyecto;
+    `;
+    const result = await pool.query(query, [idProyecto, userId]);
+
+    if (result.rows.length === 0) {
+      // El DELETE no afecto ninguna fila: o el proyecto no existe, o
+      // existe pero quien lo pide no es el dueño. Se distingue con una
+      // segunda consulta para devolver un mensaje de error mas claro.
+      const existe = await pool.query(
+        'SELECT id_usuario FROM proyecto WHERE id_proyecto = $1',
+        [idProyecto]
+      );
+      if (existe.rows.length === 0) {
+        return res.status(404).json({ error: 'El proyecto no existe.' });
+      }
+      return res.status(403).json({ error: 'Solo el dueño del proyecto puede eliminarlo.' });
+    }
+
+    res.json({ mensaje: 'Proyecto eliminado con éxito.' });
+  } catch (err) {
+    return handleDatabaseError(err, res);
+  }
+});
+
 app.get('/api/pendientes', authenticateToken, async (req, res) => {
   const userId = req.user.id_usuario;
 

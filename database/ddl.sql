@@ -229,13 +229,39 @@ CREATE TRIGGER trg_max_secciones
 
 -- =====================================================================
 -- TRIGGER_MIN_SECCIONES: limitar cada proyecto a un minimo de 1 seccion
+--
+-- FIX (arreglado tras pruebas manuales): la primera version de este
+-- trigger solo revisaba BEFORE DELETE ON seccion y contaba cuantas
+-- secciones le quedaban al proyecto. Eso funcionaba bien si alguien
+-- borraba una seccion suelta, PERO se rompia al borrar un PROYECTO
+-- completo: el ON DELETE CASCADE de la FK proyecto->seccion dispara
+-- un DELETE por cada seccion del proyecto, uno a uno, y ese DELETE
+-- SI activa este mismo trigger BEFORE DELETE. Entonces, al llegar a
+-- borrar la ultima seccion que le quedaba (porque las demas ya se
+-- habian borrado en la misma cascada), el trigger la rechazaba con
+-- "no puede quedar sin secciones" -- lo cual cancelaba el borrado
+-- del PROYECTO completo, que era la operacion que el usuario si
+-- queria hacer.
+--
+-- La solucion usa pg_trigger_depth(), una funcion de Postgres que
+-- indica si el codigo actual esta corriendo anidado dentro de otro
+-- trigger. Cuando se borra una seccion DIRECTAMENTE (DELETE FROM
+-- seccion ...), este trigger corre en el primer nivel y SI debe
+-- validar el minimo. Cuando el borrado viene EN CASCADA porque se
+-- borro el proyecto (la cascada la dispara un trigger interno de
+-- integridad referencial de Postgres), este trigger corre anidado
+-- dentro de ese proceso, y en ese caso NO debe bloquear nada: la
+-- intencion es borrar todo el proyecto, secciones incluidas.
 -- =====================================================================
-
 CREATE OR REPLACE FUNCTION validar_min_secciones()
 RETURNS TRIGGER AS $$
 DECLARE
     total_secciones INT;
 BEGIN
+    IF pg_trigger_depth() > 1 THEN
+        RETURN OLD;
+    END IF;
+
     SELECT COUNT(*) INTO total_secciones
     FROM seccion
     WHERE id_proyecto = OLD.id_proyecto;
@@ -267,4 +293,3 @@ CREATE INDEX IF NOT EXISTS idx_subtarea_funcionalidad ON subtarea(id_funcionalid
 CREATE INDEX IF NOT EXISTS idx_nota_funcionalidad ON nota_diseno(id_funcionalidad);
 CREATE INDEX IF NOT EXISTS idx_fragmento_funcionalidad ON fragmento_codigo(id_funcionalidad);
 CREATE INDEX IF NOT EXISTS idx_decision_funcionalidad ON decision_tecnica(id_funcionalidad);
- 
